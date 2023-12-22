@@ -46,7 +46,7 @@ def help(update, context):
         """To search with this bot you can easily type @Steaminlinebot and then something you want to search. for example :
 @Steaminlinebot Skyrim
 or
-@steaminlinebot Stardew
+@steaminlinebot Stardew Valley
 ...""",
     )
 
@@ -56,7 +56,9 @@ def inlinequery(update, context):
     results = []
 
     prefix = "https://store.steampowered.com/search/?term="
-
+    if len(query) < 3:
+        return
+    query = query.replace(' ', '+') #necessary for queries with spaces to work
     try:
         page = get(prefix + query)
     except Exception as e:
