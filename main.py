@@ -24,17 +24,25 @@ from gazpacho import get, Soup
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Updater, InlineQueryHandler, CommandHandler
 from telegram import InlineQueryResultArticle, InputTextMessageContent
+import json
 
 tag = 0
 
 # Enable logging
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.INFO,
-)
+# logging.basicConfig(
+#     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+#     level=logging.INFO,
+# )
 
-logger = logging.getLogger(__name__)
+# logger = logging.getLogger(__name__)
 
+class logger:
+    def critica(a):
+        print(a)
+    def error (a):
+        print(a)
+    def warning(a):
+        print(a)
 
 def start(update, context):
     update.message.reply_text(
@@ -51,7 +59,7 @@ or
 ...""",
     )
 
-
+itad_key = os.environ["ITAD_KEY"]
 def inlinequery(update, context):
     query = update.inline_query.query
     results = []
@@ -97,7 +105,17 @@ def inlinequery(update, context):
         gametagIndex += 1
         appid = tag.attrs["data-ds-appid"]
         #print(f"This is title: {title}\nAnd this is link: {link} and this is appid {appid} and this is PRICE: {price}") #debug
-        
+
+        #DBGprint("\n starting")
+        itad_response = requests.get(f"https://api.isthereanydeal.com/v02/game/plain/?key={itad_key}&shop=steam&game_id=app%2F{appid}").content
+        #DBGprint("itad_response: +" +str(itad_response))
+        itad_response_j = json.loads(itad_response)
+        #DBGprint("itad json: " + str(itad_response_j))
+        try:
+            itad_plain = itad_response_j["data"]["plain"] if itad_response_j[".meta"]["match"] else ""
+        except:
+            itad_plain = ""
+        #DBGprint("itadplaim" + itad_plain)
         results.append(
             InlineQueryResultArticle(
                 id=uuid4(),
@@ -114,18 +132,24 @@ def inlinequery(update, context):
                     [
                         [
                             InlineKeyboardButton("Steam Page", url=link),
-                            InlineKeyboardButton(
-                                "ProtonDB 🐧",
-                                url=f"https://www.protondb.com/app/{appid}",
-                            ),
-                            #[InlineKeyboardButton("Protondb")], #creates a button in its own line, bellow the buttons above
-                        ]
+                            InlineKeyboardButton("ProtonDB 🐧",url=f"https://www.protondb.com/app/{appid}"),
+
+                        
+                        ],
+                        [InlineKeyboardButton("Historico de preços", url=f"https://isthereanydeal.com/game/{itad_plain}/info/")], #creates a button in its own line, bellow the buttons above
                     ]
                 ),
             )
         )
+    
+    #DBGprint("OVER")
+    try: 
+        update.inline_query.answer(results, cache_time=30)
+    except:
+        print("poping")
+        results.pop(-1)
+        update.inline_query.answer(results, cache_time=30)
 
-    update.inline_query.answer(results, cache_time=30)
 
 
 def error(update, context):
