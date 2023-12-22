@@ -90,11 +90,11 @@ def inlinequery(update, context):
                 title=title,
                 hide_url=True,
                 description=f"Price: {price}",
-                thumb_url=f"https://cdn.akamai.steamstatic.com/steam/apps/{appid}/capsule_sm_120.jpg?t",  # low qual img
+                thumb_url=f"https://cdn.akamai.steamstatic.com/steam/apps/{appid}/capsule_sm_120.jpg?t",  #low qual thumb
                 # description=description,
                 input_message_content=InputTextMessageContent(
                     parse_mode="Markdown",
-                    message_text=f"[{title}](https://cdn.akamai.steamstatic.com/steam/apps/{appid}/header.jpg?)\nPrice:R$ {price:.2f}",
+                    message_text=f"[{title}](https://cdn.akamai.steamstatic.com/steam/apps/{appid}/header.jpg?)\nPrice: R$ {price:.2f}",
                 ),
                 reply_markup=InlineKeyboardMarkup(
                     [
