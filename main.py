@@ -14,9 +14,10 @@ original archewikibot Updated in 27/05/2021 by: @NicKoehler
 @Steaminlinebot written by GuaximFsg on github
 """
 
-
+from math import trunc
 import os
 import sys
+import requests
 import logging
 from uuid import uuid4
 from gazpacho import get, Soup
@@ -24,7 +25,7 @@ from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Updater, InlineQueryHandler, CommandHandler
 from telegram import InlineQueryResultArticle, InputTextMessageContent
 
-MAXRESULTS=6
+tag = 0
 
 # Enable logging
 logging.basicConfig(
@@ -60,7 +61,7 @@ def inlinequery(update, context):
         return
     query = query.replace(' ', '+') #necessary for queries with spaces to work
     try:
-        page = get(prefix + query)
+        page = get(prefix + query + "&cc=BR") #&cc=BR makes the search use Brazilian regional pricing
     except Exception as e:
         update.message.reply_text("Sorry, Steam is offline.")
         logger.error(e)
@@ -75,44 +76,56 @@ def inlinequery(update, context):
         {"class": "col search_price_discount_combined responsive_secondrow"},
         mode="all",
     )
-
-    for tag, pricetag, iterCount in zip(tags, pricetags, range(0,MAXRESULTS)):
+    i = 0
+    indexedPricetags = []
+    pricetagIndex = 0
+    for pricetag in pricetags:
         price = int(pricetag.attrs["data-price-final"]) * 0.01
-        #print(f"Price is {price} and by 100 {price * 100}")
+        indexedPricetags.append(price)
+        #print(f"ADD: {indexedPricetags[pricetagIndex]} and price {price} and pricetagindex {pricetagIndex}") #debug
+        pricetagIndex += 1
+
+    gametagIndex=0
+
+    for tag in tags:
+        if gametagIndex > 5: #limiting to five results for speed. not sure if there is actually any speed improvement
+            break
+        i +=1
         link = tag.attrs["href"]
         title = tag.text
+        price = indexedPricetags[gametagIndex]
+        gametagIndex += 1
         appid = tag.attrs["data-ds-appid"]
-        #DBGprint(f"appid is: {appid}")
-        #DBGprint(f"This is title: {title}\nAnd this is link: {link} and this is appid {appid} and this is PRICE: {price}")
+        #print(f"This is title: {title}\nAnd this is link: {link} and this is appid {appid} and this is PRICE: {price}") #debug
+        
         results.append(
             InlineQueryResultArticle(
                 id=uuid4(),
                 title=title,
                 hide_url=True,
-                description=f"Price: {price}",
+                description=f"Price: {price:.2f}",
                 thumb_url=f"https://cdn.akamai.steamstatic.com/steam/apps/{appid}/capsule_sm_120.jpg?t",  #low qual thumb
                 # description=description,
                 input_message_content=InputTextMessageContent(
                     parse_mode="Markdown",
-                    message_text=f"[{title}](https://cdn.akamai.steamstatic.com/steam/apps/{appid}/header.jpg?)\nPrice: R$ {price:.2f}",
+                    message_text=f"[{title}]({link})\nPrice: R$ {price:.2f}", #https://cdn.akamai.steamstatic.com/steam/apps/{appid}/header.jpg? can be used in order to not show the game's description
                 ),
                 reply_markup=InlineKeyboardMarkup(
                     [
                         [
-                            InlineKeyboardButton("Steam 💨", url=link),
+                            InlineKeyboardButton("Steam Page", url=link),
                             InlineKeyboardButton(
                                 "ProtonDB 🐧",
                                 url=f"https://www.protondb.com/app/{appid}",
                             ),
-                            InlineKeyboardButton("Price history 💨", url=f"https://isthereanydeal.com/game//info/"),
-                            # [InlineKeyboardButton("Protondb")],
+                            #[InlineKeyboardButton("Protondb")], #creates a button in its own line, bellow the buttons above
                         ]
                     ]
                 ),
             )
         )
 
-    update.inline_query.answer(results, cache_time=0)
+    update.inline_query.answer(results, cache_time=30)
 
 
 def error(update, context):
