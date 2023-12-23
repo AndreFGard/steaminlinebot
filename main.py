@@ -26,6 +26,7 @@ from telegram.ext import Updater, InlineQueryHandler, CommandHandler
 from telegram import InlineQueryResultArticle, InputTextMessageContent
 import json
 import modules
+import time
 
 MAX_RESULTS = 6
 try:
@@ -75,6 +76,7 @@ or
 
 itad_key = os.environ["ITAD_KEY"]
 def inlinequery(update, context):
+    req_start_T = time.time()
     query = update.inline_query.query
     results = []
 
@@ -88,7 +90,7 @@ def inlinequery(update, context):
         update.message.reply_text("Sorry, Steam is offline.")
         logger.error(e)
         return
-
+    souping_start = time.time()
     html = Soup(page)
     #filtering for data-ds-appids results in not showing bundles, requiring
     # appropriate filtering in the pricetags too, which is not implemented
@@ -104,9 +106,8 @@ def inlinequery(update, context):
     #     #print(f"ADD: {indexedPricetags[pricetagIndex]} and price {price} and pricetagindex {pricetagIndex}") #debug
 
     # gametagIndex=0
-
+    tag_start = time.time()
     for tag,i in zip(tags, range(MAX_RESULTS)):
-
         #DBGprint(f"start{tag.text}")
         link = tag.attrs["href"]
         title = tag.text
@@ -143,10 +144,19 @@ def inlinequery(update, context):
                 ),
             )
         )
-    
+    tag_end = time.time()
+
     #DBGprint("OVER")
     try: 
         update.inline_query.answer(results, cache_time=30)
+        update_end_t = time.time()    
+        tag_time_t = tag_end - tag_start 
+        req_t =  souping_start - req_start_T 
+        print(f"answer building total time: {req_t + tag_time_t}:")
+        print(f"\tpage download Time: {req_t}")
+        print(f"\tpage souping/scraping time: {tag_start - souping_start}")
+        print(f"\ttag building time: {tag_time_t}| per tag= {tag_time_t / MAX_RESULTS}")
+        print(f"uploading time: {-tag_end +   update_end_t}. TOTAL: {update_end_t - tag_end + req_t + tag_time_t}")
     except:
         print("poping")
         results.pop(-1)
