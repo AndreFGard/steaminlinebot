@@ -90,7 +90,7 @@ def inlinequery(update, context):
         update.message.reply_text("Sorry, Steam is offline.")
         logger.error(e)
         return
-    souping_start = time.time()
+    souping_start_t = time.time()
     html = Soup(page)
     #filtering for data-ds-appids results in not showing bundles, requiring
     # appropriate filtering in the pricetags too, which is not implemented
@@ -106,7 +106,7 @@ def inlinequery(update, context):
     #     #print(f"ADD: {indexedPricetags[pricetagIndex]} and price {price} and pricetagindex {pricetagIndex}") #debug
 
     # gametagIndex=0
-    tag_start = time.time()
+    tag_start_t = time.time()
     for tag,i in zip(tags, range(MAX_RESULTS)):
         #DBGprint(f"start{tag.text}")
         link = tag.attrs["href"]
@@ -117,7 +117,7 @@ def inlinequery(update, context):
 
         pricetag = tag.find("div", {"class": "col search_price_discount_combined responsive_secondrow"}, mode="first")
         price = int(pricetag.attrs["data-price-final"]) * 0.01
-        discount = pricetag.text or ""
+        discount = pricetag.text if pricetag.text.startswith("-") else ""
 
         #DBGprint(f"tile: {title}|\n")
 
@@ -126,12 +126,12 @@ def inlinequery(update, context):
                 id=uuid4(),
                 title=title,
                 hide_url=True,
-                description=f"Price: {price:.2f}",
+                description=f"Price: {price:.2f}" + (f"   [{discount}]" if discount else  ""),
                 thumb_url=f"https://cdn.akamai.steamstatic.com/steam/apps/{appid}/capsule_sm_120.jpg?t",  #low qual thumb
                 # description=description,
                 input_message_content=InputTextMessageContent(
                     parse_mode="Markdown",
-                    message_text=f"[{title}]({link})\nPrice: R$ {price:.2f}", #https://cdn.akamai.steamstatic.com/steam/apps/{appid}/header.jpg? can be used in order to not show the game's description
+                    message_text=f"[{title}]({link})\nPrice: R$ {price:.2f}" + (f"\nDiscount: -{modules.discountToEmoji(discount)}%" if discount else ""), #https://cdn.akamai.steamstatic.com/steam/apps/{appid}/header.jpg? can be used in order to not show the game's description
                 ),
                 reply_markup=InlineKeyboardMarkup(
                     [
@@ -149,14 +149,15 @@ def inlinequery(update, context):
     #DBGprint("OVER")
     try: 
         update.inline_query.answer(results, cache_time=30)
-        update_end_t = time.time()    
-        tag_time_t = tag_end - tag_start 
-        req_t =  souping_start - req_start_T 
-        print(f"answer building total time: {req_t + tag_time_t}:")
+        update_end = time.time()    
+        tag_time_total = tag_end - tag_start_t 
+        tagt_avg = tag_time_total / MAX_RESULTS
+        req_t =  souping_start_t - req_start_T 
+        print(f"answer building total time: {req_t + tag_time_total}:")
         print(f"\tpage download Time: {req_t}")
-        print(f"\tpage souping/scraping time: {tag_start - souping_start}")
-        print(f"\ttag building time: {tag_time_t}| per tag= {tag_time_t / MAX_RESULTS}")
-        print(f"uploading time: {-tag_end +   update_end_t}. TOTAL: {update_end_t - tag_end + req_t + tag_time_t}")
+        print(f"\tpage souping/scraping time: {tag_start_t - souping_start_t}")
+        print(f"\ttag building time: {tag_time_total}| per tag= {tagt_avg}")
+        print(f"uploading time: {-tag_end +   update_end}. TOTAL: {update_end - tag_end + req_t + tag_time_total}")
     except:
         print("poping")
         results.pop(-1)
