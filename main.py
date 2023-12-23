@@ -83,8 +83,10 @@ def inlinequery(update, context):
         return
 
     html = Soup(page)
+    #filtering for data-ds-appids results in not showing bundles, requiring
+    # appropriate filtering in the pricetags too
     tags = html.find(
-        "a", {"data-ds-appid": ""}, mode="all"
+        "a", {"data-ds-tagids": ""}, mode="all"
     )  # html tags containing info about each game
     pricetags = html.find(
         "div",
