@@ -67,6 +67,12 @@ or
 ...""",
     )
 
+# def alternative(key:any, dict: dict, alternativeKey, alternativeDict={}: dict, fail=""):
+#     if key in dict:
+#         return dict[key]
+#     elif alternativeKey != "" and alternativeKey in alternativeDict
+
+
 itad_key = os.environ["ITAD_KEY"]
 def inlinequery(update, context):
     query = update.inline_query.query
@@ -86,29 +92,34 @@ def inlinequery(update, context):
     html = Soup(page)
     #filtering for data-ds-appids results in not showing bundles, requiring
     # appropriate filtering in the pricetags too, which is not implemented
-    tags = html.find(
-        "a", {"data-ds-tagids": ""}, mode="all"
-    )  # html tags containing info about each game
-    pricetags = html.find(
-        "div", {"class": "col search_price_discount_combined responsive_secondrow"}, mode="all")
-    i = 0
-    indexedPricetags = []
-    pricetagIndex = 0
-    for pricetag in pricetags:
-        price = int(pricetag.attrs["data-price-final"]) * 0.01
-        indexedPricetags.append(price)
-        #print(f"ADD: {indexedPricetags[pricetagIndex]} and price {price} and pricetagindex {pricetagIndex}") #debug
+    tags = html.find("a", {"data-ds-tagids": ""}, mode="all")
+     # html tags containing info about each game
+    # pricetags = html.find("div", {"class": "col search_price_discount_combined responsive_secondrow"}, mode="all")
+    # i = 0
+    # indexedPricetags = []
+    # pricetagIndex = 0
+    # for pricetag in pricetags:
+    #     price = int(pricetag.attrs["data-price-final"]) * 0.01
+    #     indexedPricetags.append(price)
+    #     #print(f"ADD: {indexedPricetags[pricetagIndex]} and price {price} and pricetagindex {pricetagIndex}") #debug
 
-    for tag,pricetag,i in zip(tags, pricetags, range(MAX_RESULTS)):
+    # gametagIndex=0
+
+    for tag,i in zip(tags, range(MAX_RESULTS)):
+
+        #DBGprint(f"start{tag.text}")
         link = tag.attrs["href"]
         title = tag.text
-        price = indexedPricetags[gametagIndex]
-        gametagIndex += 1
-        appid = tag.attrs["data-ds-appid"]
-        #print(f"This is title: {title}\nAnd this is link: {link} and this is appid {appid} and this is PRICE: {price}") #debug
-
+        #if appid is not in there, it's a bundle.
+        appid = tag.attrs["data-ds-appid"] if "data-ds-appid" in tag.attrs else tag.attrs["data-ds-bundleid"]
         itad_plain = cacheApp.storage[appid] if appid in cacheApp.storage else "not found"
-        #DBGprint("itadplaim" + itad_plain)
+
+        pricetag = tag.find("div", {"class": "col search_price_discount_combined responsive_secondrow"}, mode="first")
+        price = int(pricetag.attrs["data-price-final"]) * 0.01
+        discount = pricetag.text or ""
+
+        #DBGprint(f"tile: {title}|\n")
+
         results.append(
             InlineQueryResultArticle(
                 id=uuid4(),
