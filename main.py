@@ -32,7 +32,7 @@ try:
     """Contains a map between steam appids and is there any deal yet plains"""
 except:
     print("CACHE FILE NOT FOUND")
-    cacheApp
+    cacheApp = modules.cachev0("")
 tag = 0
 
 # Enable logging
