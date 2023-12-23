@@ -27,6 +27,7 @@ from telegram import InlineQueryResultArticle, InputTextMessageContent
 import json
 import modules
 
+MAX_RESULTS = 6
 try:
     cacheApp = modules.cachev0("dict-steamappid-itadplain.json")
     """Contains a map between steam appids and is there any deal yet plains"""
@@ -84,15 +85,12 @@ def inlinequery(update, context):
 
     html = Soup(page)
     #filtering for data-ds-appids results in not showing bundles, requiring
-    # appropriate filtering in the pricetags too
+    # appropriate filtering in the pricetags too, which is not implemented
     tags = html.find(
         "a", {"data-ds-tagids": ""}, mode="all"
     )  # html tags containing info about each game
     pricetags = html.find(
-        "div",
-        {"class": "col search_price_discount_combined responsive_secondrow"},
-        mode="all",
-    )
+        "div", {"class": "col search_price_discount_combined responsive_secondrow"}, mode="all")
     i = 0
     indexedPricetags = []
     pricetagIndex = 0
@@ -100,14 +98,8 @@ def inlinequery(update, context):
         price = int(pricetag.attrs["data-price-final"]) * 0.01
         indexedPricetags.append(price)
         #print(f"ADD: {indexedPricetags[pricetagIndex]} and price {price} and pricetagindex {pricetagIndex}") #debug
-        pricetagIndex += 1
 
-    gametagIndex=0
-
-    for tag in tags:
-        if gametagIndex > 5: #limiting to five results for speed. not sure if there is actually any speed improvement
-            break
-        i +=1
+    for tag,pricetag,i in zip(tags, pricetags, range(MAX_RESULTS)):
         link = tag.attrs["href"]
         title = tag.text
         price = indexedPricetags[gametagIndex]
@@ -134,8 +126,6 @@ def inlinequery(update, context):
                         [
                             InlineKeyboardButton("Steam Page", url=link),
                             InlineKeyboardButton("ProtonDB 🐧",url=f"https://www.protondb.com/app/{appid}"),
-
-                        
                         ],
                         [InlineKeyboardButton("Historico de preços", url=f"https://isthereanydeal.com/game/{itad_plain}/info/")], #creates a button in its own line, bellow the buttons above
                     ]
