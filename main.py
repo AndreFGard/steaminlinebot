@@ -25,6 +25,9 @@ from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Updater, InlineQueryHandler, CommandHandler
 from telegram import InlineQueryResultArticle, InputTextMessageContent
 import json
+import modules
+
+cacheApp = modules.cachev0("dict-steamappid-itadplain.json")
 
 tag = 0
 
@@ -106,15 +109,7 @@ def inlinequery(update, context):
         appid = tag.attrs["data-ds-appid"]
         #print(f"This is title: {title}\nAnd this is link: {link} and this is appid {appid} and this is PRICE: {price}") #debug
 
-        #DBGprint("\n starting")
-        itad_response = requests.get(f"https://api.isthereanydeal.com/v02/game/plain/?key={itad_key}&shop=steam&game_id=app%2F{appid}").content
-        #DBGprint("itad_response: +" +str(itad_response))
-        itad_response_j = json.loads(itad_response)
-        #DBGprint("itad json: " + str(itad_response_j))
-        try:
-            itad_plain = itad_response_j["data"]["plain"] if itad_response_j[".meta"]["match"] else ""
-        except:
-            itad_plain = ""
+        itad_plain = cacheApp.storage[appid] if appid in cacheApp.storage else "not found"
         #DBGprint("itadplaim" + itad_plain)
         results.append(
             InlineQueryResultArticle(
