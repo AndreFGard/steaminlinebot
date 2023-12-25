@@ -27,16 +27,29 @@ def discountToEmoji(discount: str):
 
 
 class GameResult:
-    def __init__(self, tag: list, cacheStorage):
-        self.link = tag.attrs["href"]
-        self.title = tag.text
-        #if appid is not in there, it's a bundle.
-        self.appid = tag.attrs["data-ds-appid"] if "data-ds-appid" in tag.attrs else tag.attrs["data-ds-bundleid"]
-        self.itad_plain = cacheStorage[self.appid] if self.appid in cacheStorage else "not found"
+    def __init__(self, link:str, title:str, appid:str,itad_plain:str,price:float,discount:str, cacheStorage: dict):
+        self.link = link
+        self.link = link
+        self.title = title
+        self.appid = appid
+        self.itad_plain = itad_plain
+        self.price = price
+        self.discount = discount
 
-        self.pricetag = tag.find("div", {"class": "col search_price_discount_combined responsive_secondrow"}, mode="first")
-        self.price = int(self.pricetag.attrs["data-price-final"]) * 0.01
-        self.discount = self.pricetag.text if self.pricetag.text.startswith("-") else ""
+    def makeGameResultFromTag(tag: list[gazpacho.Soup], cacheStorage: dict):
+        """Game found with the search and it's informations"""
+        link = tag.attrs["href"] if "href" in tag.attrs else ""
+        title = tag.text
+        #if appid is not in there, it's a bundle.
+        appid = tag.attrs["data-ds-appid"] if "data-ds-appid" in tag.attrs else tag.attrs["data-ds-bundleid"]
+        itad_plain = cacheStorage[appid] if appid in cacheStorage else "not found"
+
+        pricetag = tag.find("div", {"class": "col search_price_discount_combined responsive_secondrow"}, mode="first")
+        price = int(pricetag.attrs["data-price-final"]) * 0.01
+        discount = pricetag.text if pricetag.text.startswith("-") else ""
+        return(GameResult(link, title, appid, itad_plain, price, discount, cacheStorage))
+
+
 
 def makeInlineQueryResultArticle(result: GameResult):
     return InlineQueryResultArticle(

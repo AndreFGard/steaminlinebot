@@ -102,43 +102,12 @@ def inlinequery(update, context):
 
     # gametagIndex=0
     tag_start_t = time.time()
+
     for tag,i in zip(tags, range(MAX_RESULTS)):
-        #DBGprint(f"start{tag.text}")
-        link = tag.attrs["href"]
-        title = tag.text
-        #if appid is not in there, it's a bundle.
-        appid = tag.attrs["data-ds-appid"] if "data-ds-appid" in tag.attrs else tag.attrs["data-ds-bundleid"]
-        itad_plain = cacheApp.storage[appid] if appid in cacheApp.storage else "not found"
-
-        pricetag = tag.find("div", {"class": "col search_price_discount_combined responsive_secondrow"}, mode="first")
-        price = int(pricetag.attrs["data-price-final"]) * 0.01
-        discount = pricetag.text if pricetag.text.startswith("-") else ""
-
-        #DBGprint(f"tile: {title}|\n")
-
-        results.append(
-            InlineQueryResultArticle(
-                id=uuid4(),
-                title=title,
-                hide_url=True,
-                description=f"Price: {price:.2f}" + (f"   [{discount}]" if discount else  ""),
-                thumb_url=f"https://cdn.akamai.steamstatic.com/steam/apps/{appid}/capsule_sm_120.jpg?t",  #low qual thumb
-                # description=description,
-                input_message_content=InputTextMessageContent(
-                    parse_mode="Markdown",
-                    message_text=f"[{title}]({link})\nPrice: R$ {price:.2f}" + (f"\nDiscount: -{modules.discountToEmoji(discount)}%" if discount else ""), #https://cdn.akamai.steamstatic.com/steam/apps/{appid}/header.jpg? can be used in order to not show the game's description
-                ),
-                reply_markup=InlineKeyboardMarkup(
-                    (
-                       (
-                            InlineKeyboardButton("Steam Page", url=link),
-                            InlineKeyboardButton("ProtonDB 🐧",url=f"https://www.protondb.com/app/{appid}"),
-                        ),
-                        [InlineKeyboardButton("Historico de preços", url=f"https://isthereanydeal.com/game/{itad_plain}/info/")], #creates a button in its own line, bellow the buttons above
-                    )
-                ),
-            )
-        )
+        gameResult = modules.GameResult.makeGameResultFromTag(tag, cacheApp.storage)
+        results.append(modules.makeInlineQueryResultArticle(gameResult))
+    
+    
     tag_end = time.time()
 
     #DBGprint("OVER")
