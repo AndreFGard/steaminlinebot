@@ -68,11 +68,6 @@ or
 ...""",
     )
 
-# def alternative(key:any, dict: dict, alternativeKey, alternativeDict={}: dict, fail=""):
-#     if key in dict:
-#         return dict[key]
-#     elif alternativeKey != "" and alternativeKey in alternativeDict
-
 
 itad_key = os.environ["ITAD_KEY"]
 def inlinequery(update, context):
@@ -134,13 +129,13 @@ def inlinequery(update, context):
                     message_text=f"[{title}]({link})\nPrice: R$ {price:.2f}" + (f"\nDiscount: -{modules.discountToEmoji(discount)}%" if discount else ""), #https://cdn.akamai.steamstatic.com/steam/apps/{appid}/header.jpg? can be used in order to not show the game's description
                 ),
                 reply_markup=InlineKeyboardMarkup(
-                    [
-                        [
+                    (
+                       (
                             InlineKeyboardButton("Steam Page", url=link),
                             InlineKeyboardButton("ProtonDB 🐧",url=f"https://www.protondb.com/app/{appid}"),
-                        ],
+                        ),
                         [InlineKeyboardButton("Historico de preços", url=f"https://isthereanydeal.com/game/{itad_plain}/info/")], #creates a button in its own line, bellow the buttons above
-                    ]
+                    )
                 ),
             )
         )
