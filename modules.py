@@ -12,6 +12,7 @@ API_APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails?filters=bas
 
 
 class cachev0:
+    """Contains a map between steam appids and is there any deal yet plains"""
     def __init__(self, jsonFileName: str):
         self.storage = {}
         self.changesToWrite = False
@@ -131,7 +132,7 @@ def makeInlineQueryResultArticle(result: GameResult):
             )
 
 class SteamAsyncResults:
-    def __init(self, query, MAX_RESULTS):
+    def __init__(self, MAX_RESULTS):
         self.API_APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails?filters=basic,price_overview&appids={}"
         self.MAX_RESULTS = MAX_RESULTS
         self.API_GAME_SEARCH = "https://store.steampowered.com/search/suggest?term={}&f=games&cc=BR&realm=1&l=english"
@@ -142,7 +143,6 @@ class SteamAsyncResults:
             tasks.append((session.get(self.API_GAME_SEARCH.format(gamename))))
         return asyncio.gather(*tasks)
 
-
     async def getGames(self, games: list):
         async with aiohttp.ClientSession() as session:
             return await self.getTasks(games, session)
@@ -151,7 +151,6 @@ class SteamAsyncResults:
         responses = await self.getGames(games_input)
         appids = {}
         for response in responses:
-            # If it's not JSON, assume it's HTML and parse it with BeautifulSoup
             html_content = await response.text()
             soup = BeautifulSoup(html_content, 'html.parser')
             for l in soup.find_all('a'):
@@ -168,6 +167,14 @@ class SteamAsyncResults:
         results = await asyncio.gather(*tasks)
         return results
 
+    async def getGameResultsFromQuery(self, query:str):
+        appidsAsync = (await self.processAsyncGames((query,)))
+        responses = appidsAsync
 
-
-#results = list(map(makeInlineQueryResultArticle))
+        async with aiohttp.ClientSession() as session:
+            data = tuple(GameResult.makeGameResultFromSteamApiGameDetails(gameDetail, {}) for gameDetail in (await self.getAllGameDetails(tuple(responses.keys()), session)))
+            return data
+        
+    def getDetailsQuerySync(self, query):
+        data = asyncio.run(self.getGameResultsFromQuery(query))
+        return data
