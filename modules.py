@@ -3,9 +3,7 @@ import gazpacho
 from telegram import InlineQueryResultArticle, InputTextMessageContent
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 from uuid import uuid4
-from bs4 import BeautifulSoup
-import aiohttp
-import asyncio
+
 
 API_APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails?filters=basic,price_overview&appids={}"
 
@@ -107,7 +105,9 @@ def scrapSteam(query, MAX_RESULTS, cacheApp: dict ={}):
     results_building_end = time.time()
     return results
 
-
+from bs4 import BeautifulSoup
+import aiohttp
+import asyncio
 def makeInlineQueryResultArticle(result: GameResult):
     return InlineQueryResultArticle(
                 id=uuid4(),
