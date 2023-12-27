@@ -35,7 +35,15 @@ try:
 except:
     print("CACHE FILE NOT FOUND")
     cacheApp = modules.cachev0("")
-tag = 0
+
+ERROR_RESULT = InlineQueryResultArticle(
+                id=uuid4(),
+                title="Error",
+                hide_url=True,
+                description=("Error: Sorry. Please report this with the /report command so we can fix it."),
+                input_message_content=InputTextMessageContent(
+                    parse_mode="Markdown",
+                    message_text=("Error: Sorry. Please report this with the /report command so we can fix it."),),)
 
 # Enable logging
 # logging.basicConfig(
@@ -71,57 +79,16 @@ or
 
 itad_key = os.environ["ITAD_KEY"]
 def inlinequery(update, context):
-    req_start_T = time.time()
     query = update.inline_query.query
-    results = []
 
-    prefix = "https://store.steampowered.com/search/?term="
-    if len(query) < 3:
-        return
-    query = query.replace(' ', '+') #necessary for queries with spaces to work
-    try:
-        page = get(prefix + query + "&cc=BR") #&cc=BR makes the search use Brazilian regional pricing
-    except Exception as e:
-        update.message.reply_text("Sorry, Steam is offline.")
-        logger.error(e)
-        return
-    souping_start_t = time.time()
-    html = Soup(page)
-    #filtering for data-ds-appids results in not showing bundles, requiring
-    # appropriate filtering in the pricetags too, which is not implemented
-    tags = html.find("a", {"data-ds-tagids": ""}, mode="all")
-     # html tags containing info about each game
-    # pricetags = html.find("div", {"class": "col search_price_discount_combined responsive_secondrow"}, mode="all")
-    # i = 0
-    # indexedPricetags = []
-    # pricetagIndex = 0
-    # for pricetag in pricetags:
-    #     price = int(pricetag.attrs["data-price-final"]) * 0.01
-    #     indexedPricetags.append(price)
-    #     #print(f"ADD: {indexedPricetags[pricetagIndex]} and price {price} and pricetagindex {pricetagIndex}") #debug
-
-    # gametagIndex=0
-    tag_start_t = time.time()
-
-    for tag,i in zip(tags, range(MAX_RESULTS)):
-        gameResult = modules.GameResult.makeGameResultFromTag(tag, cacheApp.storage)
-        results.append(modules.makeInlineQueryResultArticle(gameResult))
-    
-    
-    tag_end = time.time()
-
+    telegramResults = modules.scrapSteam(query, MAX_RESULTS, cacheApp)
+    results = [result for result in telegramResults if result]
+    if len(results) == 0:
+        results = [ERROR_RESULT]
     #DBGprint("OVER")
     try: 
         update.inline_query.answer(results, cache_time=30)
-        update_end = time.time()    
-        tag_time_total = tag_end - tag_start_t 
-        tagt_avg = tag_time_total / MAX_RESULTS
-        req_t =  souping_start_t - req_start_T 
-        print(f"answer building total time: {req_t + tag_time_total}:")
-        print(f"\tpage download Time: {req_t}")
-        print(f"\tpage souping/scraping time: {tag_start_t - souping_start_t}")
-        print(f"\ttag building time: {tag_time_total}| per tag= {tagt_avg}")
-        print(f"uploading time: {-tag_end +   update_end}. TOTAL: {update_end - tag_end + req_t + tag_time_total}")
+
     except:
         print("poping")
         results.pop(-1)
