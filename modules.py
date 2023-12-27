@@ -73,7 +73,38 @@ class GameResult:
                 return(GameResult(link, title, appid, itad_plain, price, discount, cacheStorage))
         return False
 
+import time
+from gazpacho import get, Soup
+def scrapSteam(query, MAX_RESULTS, cacheApp: dict ={}):
+    results = []
+    req_start_T = time.time()
+    prefix = "https://store.steampowered.com/search/?term="
+    if len(query) < 3:
+        return
+    query = query.replace(' ', '+') #necessary for queries with spaces to work
+    try:
+        page = get(prefix + query + "&cc=BR") #&cc=BR makes the search use Brazilian regional pricing
+    except Exception as e:
+        return [False]
+        logger.error(e)
+        return
+    download_end = time.time()
+    html = Soup(page)
+    #filtering for data-ds-appids results in not showing bundles, requiring
+    # appropriate filtering in the pricetags too, which is not implemented
+    tags = html.find("a", {"data-ds-tagids": ""}, mode="all")
+    tag_start_t = time.time()
 
+    for tag,i in zip(tags, range(MAX_RESULTS)):
+        gameResult = GameResult.makeGameResultFromTag(tag, cacheApp.storage)
+        results.append(makeInlineQueryResultArticle(gameResult))
+    results_building_end = time.time()    
+    results_buinding_total = results_building_end - download_end 
+    req_t =  download_end - req_start_T 
+    print(f"answer building total time: {req_t + results_buinding_total}:")
+    print(f"\tpage download Time: {req_t}")
+    results_building_end = time.time()
+    return results
 
 
 def makeInlineQueryResultArticle(result: GameResult):
@@ -98,5 +129,45 @@ def makeInlineQueryResultArticle(result: GameResult):
                     )
                 ),
             )
-        
+
+class SteamAsyncResults:
+    def __init(self, query, MAX_RESULTS):
+        self.API_APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails?filters=basic,price_overview&appids={}"
+        self.MAX_RESULTS = MAX_RESULTS
+        self.API_GAME_SEARCH = "https://store.steampowered.com/search/suggest?term={}&f=games&cc=BR&realm=1&l=english"
+    
+    def getTasks(self, games: list, session: aiohttp.ClientSession):
+        tasks = []
+        for gamename in games:
+            tasks.append((session.get(self.API_GAME_SEARCH.format(gamename))))
+        return asyncio.gather(*tasks)
+
+
+    async def getGames(self, games: list):
+        async with aiohttp.ClientSession() as session:
+            return await self.getTasks(games, session)
+
+    async def processAsyncGames(self, games_input: list):
+        responses = await self.getGames(games_input)
+        appids = {}
+        for response in responses:
+            # If it's not JSON, assume it's HTML and parse it with BeautifulSoup
+            html_content = await response.text()
+            soup = BeautifulSoup(html_content, 'html.parser')
+            for l in soup.find_all('a'):
+                if l.has_attr("data-ds-appid"):
+                    appids[l["data-ds-appid"]] = ""
+        return appids
+
+    async def getGameDetailsFromAppid(self, appid, session):
+        async with session.get(API_APP_DETAILS_URL.format(appid)) as r:
+            return await r.json()
+
+    async def getAllGameDetails(self, appids, session):
+        tasks =[asyncio.create_task(self.getGameDetailsFromAppid(appid, session)) for appid in appids]
+        results = await asyncio.gather(*tasks)
+        return results
+
+
+
 #results = list(map(makeInlineQueryResultArticle))
