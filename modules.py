@@ -3,6 +3,13 @@ import gazpacho
 from telegram import InlineQueryResultArticle, InputTextMessageContent
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 from uuid import uuid4
+from bs4 import BeautifulSoup
+import aiohttp
+import asyncio
+
+API_APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails?filters=basic,price_overview&appids={}"
+
+
 
 class cachev0:
     def __init__(self, jsonFileName: str):
@@ -48,6 +55,24 @@ class GameResult:
         price = int(pricetag.attrs["data-price-final"]) * 0.01
         discount = pricetag.text if pricetag.text.startswith("-") else ""
         return(GameResult(link, title, appid, itad_plain, price, discount, cacheStorage))
+    
+    def makeGameResultFromSteamApiGameDetails(gamedetails:dict,cacheStorage: dict ={}):
+        if gamedetails:
+            appid: str = tuple(gamedetails.keys())[0]
+            if gamedetails[appid]['success']:
+                data = gamedetails[appid]['data']
+                title = data['name']
+                link = f"https://store.steampowered.com/app/{appid}/"
+                itad_plain = cacheStorage[appid] if appid in cacheStorage else "not found"
+                if data['is_free'] or 'price_overview' not in data:
+                    price = 0.0
+                    discount = False
+                else:
+                    price = data['price_overview']['final_formatted'] 
+                    discount = discount = "-" + str(data['price_overview']['discount_percent']) + "%"
+                return(GameResult(link, title, appid, itad_plain, price, discount, cacheStorage))
+        return False
+
 
 
 
