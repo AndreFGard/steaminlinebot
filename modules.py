@@ -67,7 +67,7 @@ class GameResult:
                     price = 0.0
                     discount = False
                 else:
-                    price = data['price_overview']['final_formatted'] 
+                    price = data['price_overview']['final'] * 0.01
                     discount = discount = "-" + str(data['price_overview']['discount_percent']) + "%"
                 return(GameResult(link, title, appid, itad_plain, price, discount, cacheStorage))
         return False
@@ -105,9 +105,7 @@ def scrapSteam(query, MAX_RESULTS, cacheApp: dict ={}):
     results_building_end = time.time()
     return results
 
-from bs4 import BeautifulSoup
-import aiohttp
-import asyncio
+
 def makeInlineQueryResultArticle(result: GameResult):
     return InlineQueryResultArticle(
                 id=uuid4(),
@@ -131,24 +129,32 @@ def makeInlineQueryResultArticle(result: GameResult):
                 ),
             )
 
-class SteamAsyncResults:
-    def __init__(self, MAX_RESULTS):
+
+from bs4 import BeautifulSoup
+import aiohttp
+import asyncio
+class SteamSearcher:
+    def __init__(self, MAX_RESULTS, cacheStorage):
         self.API_APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails?filters=basic,price_overview&appids={}"
         self.MAX_RESULTS = MAX_RESULTS
         self.API_GAME_SEARCH = "https://store.steampowered.com/search/suggest?term={}&f=games&cc=BR&realm=1&l=english"
+        self.cacheStorage = cacheStorage
     
-    def getTasks(self, games: list, session: aiohttp.ClientSession):
+    def getTasks(self, gamenames: list, session: aiohttp.ClientSession):
+        """returns future containg the html containing the search for each given game name"""
         tasks = []
-        for gamename in games:
+        for gamename in gamenames:
             tasks.append((session.get(self.API_GAME_SEARCH.format(gamename))))
         return asyncio.gather(*tasks)
 
-    async def getGames(self, games: list):
+    async def searchGames(self, gamenames: list):
+        """returns html containing the search for each given game name"""
         async with aiohttp.ClientSession() as session:
-            return await self.getTasks(games, session)
+            return await self.getTasks(gamenames, session)
 
-    async def processAsyncGames(self, games_input: list):
-        responses = await self.getGames(games_input)
+    async def getAppids(self, gamenames: list):
+        "analyzes html and returns dict of every appid found in the search for each given game name. empty keys (for now)"
+        responses = await self.searchGames(gamenames)
         appids = {}
         for response in responses:
             html_content = await response.text()
@@ -158,23 +164,29 @@ class SteamAsyncResults:
                     appids[l["data-ds-appid"]] = ""
         return appids
 
-    async def getGameDetailsFromAppid(self, appid, session):
-        async with session.get(API_APP_DETAILS_URL.format(appid)) as r:
+    async def getGameDetailsFromAppid(self, appid, session) -> dict:
+        """makes steam api details request for given appid and returns future for it's json response"""
+        async with session.get(self.API_APP_DETAILS_URL.format(appid)) as r:
             return await r.json()
 
     async def getAllGameDetails(self, appids, session):
+        """gets game details for each given appid and returns list with every response's json"""
         tasks =[asyncio.create_task(self.getGameDetailsFromAppid(appid, session)) for appid in appids]
         results = await asyncio.gather(*tasks)
         return results
 
-    async def getGameResultsFromQuery(self, query:str):
-        appidsAsync = (await self.processAsyncGames((query,)))
-        responses = appidsAsync
+    async def makeGameResultsFromGameDetails(self, query:str):
+        """gets game details for each appid found in the search for the given
+          query(game name) and makes GameResult obj from each of those and returns a list of them all"""
+        appids = tuple((await self.getAppids((query,))).keys())
 
         async with aiohttp.ClientSession() as session:
-            data = tuple(GameResult.makeGameResultFromSteamApiGameDetails(gameDetail, {}) for gameDetail in (await self.getAllGameDetails(tuple(responses.keys()), session)))
+            data = tuple(GameResult.makeGameResultFromSteamApiGameDetails(gameDetail, self.cacheStorage)
+                          for gameDetail in (await self.getAllGameDetails(appids, session)))
             return data
         
-    def getDetailsQuerySync(self, query):
-        data = asyncio.run(self.getGameResultsFromQuery(query))
+    def getGameResultsSync(self, query):
+        """(sync) gets game details for each appid found in the search for the given
+          query(game name) and makes GameResult obj from each of those and returns a list of them all"""
+        data = asyncio.run(self.makeGameResultsFromGameDetails(query))
         return data
