@@ -29,9 +29,11 @@ import modules
 import time
 
 MAX_RESULTS = 6
+
+
+itad_key = os.environ["ITAD_KEY"]
 try:
     cacheApp = modules.cachev0("dict-steamappid-itadplain.json")
-    """Contains a map between steam appids and is there any deal yet plains"""
 except:
     print("CACHE FILE NOT FOUND")
     cacheApp = modules.cachev0("")
@@ -69,7 +71,7 @@ def start(update, context):
 
 def help(update, context):
     update.message.reply_text(
-        """To search with this bot you can easily type @Steaminlinebot and then something you want to search. for example :
+        """To search with this bot,type @Steaminlinebot and then something you want to search in the message box. for example :
 @Steaminlinebot Skyrim
 or
 @steaminlinebot Stardew Valley
@@ -77,24 +79,38 @@ or
     )
 
 
-itad_key = os.environ["ITAD_KEY"]
-def inlinequery(update, context):
-    query = update.inline_query.query
 
+def inlinequeryScraping(update, context):
+    query = update.inline_query.query
+    if len(query) < 3:
+        return
     telegramResults = modules.scrapSteam(query, MAX_RESULTS, cacheApp)
     results = [result for result in telegramResults if result]
     if len(results) == 0:
         results = [ERROR_RESULT]
-    #DBGprint("OVER")
-    try: 
-        update.inline_query.answer(results, cache_time=30)
-
-    except:
-        print("poping")
-        results.pop(-1)
-        update.inline_query.answer(results, cache_time=30)
+    update.inline_query.answer(results, cache_time=30)
 
 
+steamSearcher = modules.SteamSearcher(MAX_RESULTS, cacheApp.storage)
+def inlinequerySteamApi(update, context):
+    start = time.time()
+    query = update.inline_query.query
+    if len(query) < 3:
+        return
+    
+    gameResults = steamSearcher.getGameResultsSync((query,))
+    gameResults = [result for result in gameResults if result]
+    if len(gameResults) == 0:
+        gameResults = [ERROR_RESULT]
+
+    telegramResultArticles =  tuple(map(modules.makeInlineQueryResultArticle, gameResults))
+    start_uploading = time.time()
+    update.inline_query.answer(telegramResultArticles, cache_time=30)
+    end = time.time()
+    print(f"took {(start_uploading - start):.4f}s + {(end - start_uploading):.4f}s")
+
+#choose which version to use here
+INLINEQUERYFUNC = inlinequerySteamApi
 
 def error(update, context):
     logger.warning(f"Update {update} caused error {context.error}")
@@ -117,7 +133,7 @@ def main():
     dp.add_handler(CommandHandler("help", help))
 
     # on noncommand i.e message - echo the message on Telegram
-    dp.add_handler(InlineQueryHandler(inlinequery))
+    dp.add_handler(InlineQueryHandler(INLINEQUERYFUNC))
 
     # log all errors
     dp.add_error_handler(error)
