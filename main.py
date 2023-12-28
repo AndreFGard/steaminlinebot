@@ -5,13 +5,10 @@
 # This program is dedicated to the public domain under the GPL3 license.
 
 """
-Original archewiki bot Written by: @Alireza6677
-                                   alireza6677@gmail.com
-
-original archewikibot Updated in 27/05/2021 by: @NicKoehler
+Inspired by the archewikibot
 """
 """
-@Steaminlinebot written by GuaximFsg on github
+@Steaminlinebot written by GuaximFsg (now AndreFGard) on github
 """
 
 from math import trunc
@@ -56,7 +53,7 @@ ERROR_RESULT = InlineQueryResultArticle(
 # logger = logging.getLogger(__name__)
 
 class logger:
-    def critica(a):
+    def critical(a):
         print(a)
     def error (a):
         print(a)
@@ -71,11 +68,10 @@ def start(update, context):
 
 def help(update, context):
     update.message.reply_text(
-        """To search with this bot,type @Steaminlinebot and then something you want to search in the message box. for example :
+        """To search with this bot, type @Steaminlinebot and then something you want to search in the message box. for example:
 @Steaminlinebot Skyrim
 or
-@steaminlinebot Stardew Valley
-...""",
+@steaminlinebot Stardew Valley""",
     )
 
 
@@ -84,9 +80,12 @@ def inlinequeryScraping(update, context):
     query = update.inline_query.query
     if len(query) < 3:
         return
-    telegramResults = modules.scrapSteam(query, MAX_RESULTS, cacheApp)
-    results = [result for result in telegramResults if result]
-    if len(results) == 0:
+    try:
+        telegramResults = modules.scrapSteam(query, MAX_RESULTS, cacheApp)
+        results = [result for result in telegramResults if result]
+        if len(results) == 0:
+            results = [ERROR_RESULT]
+    except:
         results = [ERROR_RESULT]
     update.inline_query.answer(results, cache_time=30)
 
@@ -98,10 +97,14 @@ def inlinequerySteamApi(update, context):
     if len(query) < 3:
         return
     
-    gameResults = steamSearcher.getGameResultsSync((query,))
-    gameResults = [result for result in gameResults if result]
-    if len(gameResults) == 0:
+    try:
+        gameResults = steamSearcher.getGameResultsSync((query,))
+        gameResults = [result for result in gameResults if result]
+        if len(gameResults) == 0:
+            gameResults = [ERROR_RESULT]
+    except:
         gameResults = [ERROR_RESULT]
+
 
     telegramResultArticles =  tuple(map(modules.makeInlineQueryResultArticle, gameResults))
     start_uploading = time.time()
