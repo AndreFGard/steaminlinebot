@@ -140,17 +140,17 @@ class SteamSearcher:
         self.API_GAME_SEARCH = "https://store.steampowered.com/search/suggest?term={}&f=games&cc=BR&realm=1&l=english"
         self.cacheStorage = cacheStorage
     
-    def getTasks(self, gamenames: list, session: aiohttp.ClientSession):
-        """returns future containg the html containing the search for each given game name"""
+    def getTasks(self, parameters: list, session: aiohttp.ClientSession, url :str):
+        """returns future containg the response of the request to the given url for each parameter (1 parameter per request)"""
         tasks = []
-        for gamename in gamenames:
-            tasks.append((session.get(self.API_GAME_SEARCH.format(gamename))))
-        return asyncio.gather(*tasks)
+        for param in parameters:
+            tasks.append((session.get(url.format(param))))
+        return tasks
 
     async def searchGames(self, gamenames: list):
         """returns html containing the search for each given game name"""
         async with aiohttp.ClientSession() as session:
-            return await self.getTasks(gamenames, session)
+            return await asyncio.gather(*(self.getTasks(gamenames, session, self.API_GAME_SEARCH)))
 
     async def getAppids(self, gamenames: list):
         "analyzes html and returns dict of every appid found in the search for each given game name. empty keys (for now)"
