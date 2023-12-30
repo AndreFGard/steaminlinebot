@@ -35,14 +35,7 @@ except:
     print("CACHE FILE NOT FOUND")
     cacheApp = modules.cachev0("")
 
-ERROR_RESULT = InlineQueryResultArticle(
-                id=uuid4(),
-                title="Error",
-                hide_url=True,
-                description=("Error: Sorry. Please report this with the /report command so we can fix it."),
-                input_message_content=InputTextMessageContent(
-                    parse_mode="Markdown",
-                    message_text=("Error: Sorry. Please report this with the /report command so we can fix it."),),)
+ERROR_RESULT = modules.ERROR_RESULT 
 
 # Enable logging
 # logging.basicConfig(

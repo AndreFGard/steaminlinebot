@@ -6,7 +6,10 @@ from uuid import uuid4
 
 
 API_APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails?filters=basic,price_overview&appids={}"
-
+ERROR_RESULT=InlineQueryResultArticle(id=uuid4(),
+                title="Error",hide_url=True,description=("Error: Sorry. Please report this with the /report command so we can fix it."),
+                input_message_content=InputTextMessageContent(parse_mode="Markdown",
+                message_text=("Error: Sorry. Please report this with the /report command so we can fix it."),),)
 
 
 class cachev0:
@@ -56,21 +59,24 @@ class GameResult:
         return(GameResult(link, title, appid, itad_plain, price, discount, cacheStorage))
     
     def makeGameResultFromSteamApiGameDetails(gamedetails:dict,cacheStorage: dict ={}):
-        if gamedetails:
+        try:
             appid: str = tuple(gamedetails.keys())[0]
             if gamedetails[appid]['success']:
                 data = gamedetails[appid]['data']
                 title = data['name']
                 link = f"https://store.steampowered.com/app/{appid}/"
                 itad_plain = cacheStorage[appid] if appid in cacheStorage else "not found"
+                price = 0.0
                 if data['is_free'] or 'price_overview' not in data:
                     price = 0.0
                     discount = False
                 else:
                     price = data['price_overview']['final'] * 0.01
                     discount = discount = "-" + str(data['price_overview']['discount_percent']) + "%"
+                print(f"{title}: {price} - {appid}")
                 return(GameResult(link, title, appid, itad_plain, price, discount, cacheStorage))
-        return False
+        except:
+            return ERROR_RESULT
 
 import time
 from gazpacho import get, Soup
