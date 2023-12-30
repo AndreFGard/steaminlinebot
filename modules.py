@@ -33,7 +33,7 @@ def discountToEmoji(discount: str):
 
 
 class GameResult:
-    def __init__(self, link:str, title:str, appid:str,itad_plain:str,price:float,discount:str, cacheStorage: dict):
+    def __init__(self, link:str, title:str, appid:str,itad_plain:str,price:float,discount:str, protondb_rating="", cacheStorage: dict = {}):
         self.link = link
         self.link = link
         self.title = title
@@ -41,6 +41,7 @@ class GameResult:
         self.itad_plain = itad_plain
         self.price = price
         self.discount = discount
+        self.protondb_rating = protondb_rating #optional
 
     def makeGameResultFromTag(tag: list[gazpacho.Soup], cacheStorage: dict):
         """Game found with the search and it's informations"""
@@ -116,7 +117,9 @@ def makeInlineQueryResultArticle(result: GameResult):
                 # description=description,
                 input_message_content=InputTextMessageContent(
                     parse_mode="Markdown",
-                    message_text=f"[{result.title}]({result.link})\nPrice: R$ {result.price:.2f}" + (f"\nDiscount: -{discountToEmoji(result.discount)}%" if result.discount else ""), #https://cdn.akamai.steamstatic.com/steam/apps/{appid}/header.jpg? can be used in order to not show the game's description
+                    message_text=f"[{result.title}]({result.link})\nPrice: R$ {result.price:.2f}" +
+                      (f"\nDiscount: -{discountToEmoji(result.discount)}%" if result.discount else "") + 
+                      (f"\nProtonDB Rating: {result.protondb_rating} " if result.protondb_rating else "") #https://cdn.akamai.steamstatic.com/steam/apps/{appid}/header.jpg? can be used in order to not show the game's description
                 ),
                 reply_markup=InlineKeyboardMarkup(
                     (
