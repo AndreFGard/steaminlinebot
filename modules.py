@@ -36,14 +36,14 @@ def discountToEmoji(discount: str):
 
 
 class GameResult:
-    def __init__(self, link:str, title:str, appid:str,itad_plain:str,price:float,discount:str, cacheStorage: dict):
+    def __init__(self, link:str, title:str, appid:str,itad_plain:str,price:float,discount:str, cacheStorage: dict = {}, price_formatted :int = False):
         self.link = link
         self.link = link
         self.title = title
         self.appid = appid
         self.itad_plain = itad_plain
-        self.price = price
         self.discount = discount
+        self.price = price
 
     def makeGameResultFromTag(tag: list[gazpacho.Soup], cacheStorage: dict):
         """Game found with the search and it's informations"""
@@ -54,7 +54,7 @@ class GameResult:
         itad_plain = cacheStorage[appid] if appid in cacheStorage else "not found"
 
         pricetag = tag.find("div", {"class": "col search_price_discount_combined responsive_secondrow"}, mode="first")
-        price = int(pricetag.attrs["data-price-final"]) * 0.01
+        price = f"{(int(pricetag.attrs['data-price-final']) * 0.01):.2f}:"
         discount = pricetag.text if pricetag.text.startswith("-") else ""
         return(GameResult(link, title, appid, itad_plain, price, discount, cacheStorage))
     
@@ -71,7 +71,7 @@ class GameResult:
                     price = 0.0
                     discount = False
                 else:
-                    price = data['price_overview']['final'] * 0.01
+                    price = data['price_overview']['final_formatted']
                     discount = discount = "-" + str(data['price_overview']['discount_percent']) + "%"
                 print(f"{title}: {price} - {appid}")
                 return(GameResult(link, title, appid, itad_plain, price, discount, cacheStorage))
@@ -88,7 +88,7 @@ def scrapSteam(query, MAX_RESULTS, cacheApp: dict ={}):
         return
     query = query.replace(' ', '+') #necessary for queries with spaces to work
     try:
-        page = get(prefix + query + "&cc=BR") #&cc=BR makes the search use Brazilian regional pricing
+        page = get(prefix + query + "&cc=US") #&cc=BR makes the search use Brazilian regional pricing
     except Exception as e:
         return [False]
         logger.error(e)
@@ -117,12 +117,13 @@ def makeInlineQueryResultArticle(result: GameResult):
                 id=uuid4(),
                 title=result.title,
                 hide_url=True,
-                description=f"Price: {result.price:.2f}" + (f"   [{result.discount}]" if result.discount else  ""),
+                description=f"Price: {result.price}" + (f"   [{result.discount}]" if result.discount else  ""),
                 thumb_url=f"https://cdn.akamai.steamstatic.com/steam/apps/{result.appid}/capsule_sm_120.jpg?t",  #low qual thumb
                 # description=description,
                 input_message_content=InputTextMessageContent(
                     parse_mode="Markdown",
-                    message_text=f"[{result.title}]({result.link})\nPrice: R$ {result.price:.2f}" + (f"\nDiscount: -{discountToEmoji(result.discount)}%" if result.discount else ""), #https://cdn.akamai.steamstatic.com/steam/apps/{appid}/header.jpg? can be used in order to not show the game's description
+                    #message_text=f"[{result.title}]({result.link})\nPrice:{result.price_formatted}" + (f"\nDiscount: -{discountToEmoji(result.discount)}%" if result.discount else ""), #https://cdn.akamai.steamstatic.com/steam/apps/{appid}/header.jpg? can be used in order to not show the game's description
+                    message_text=f"[{result.title}]{result.link})\nPrice: {result.price}"
                 ),
                 reply_markup=InlineKeyboardMarkup(
                     (
@@ -141,7 +142,7 @@ import aiohttp
 import asyncio
 class SteamSearcher:
     def __init__(self, MAX_RESULTS, cacheStorage):
-        self.API_APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails?filters=basic,price_overview&appids={}"
+        self.API_APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails?filters=basic,price_overview&appids={}&cc=BR"
         self.MAX_RESULTS = MAX_RESULTS
         self.API_GAME_SEARCH = "https://store.steampowered.com/search/suggest?term={}&f=games&cc=BR&realm=1&l=english"
         self.cacheStorage = cacheStorage
@@ -196,3 +197,4 @@ class SteamSearcher:
           query(game name) and makes GameResult obj from each of those and returns a list of them all"""
         data = asyncio.run(self.makeGameResultsFromGameDetails(query))
         return data
+
