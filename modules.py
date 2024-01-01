@@ -5,7 +5,7 @@ from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 from uuid import uuid4
 
 
-API_APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails?filters=basic,price_overview&appids={}"
+API_APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails?filters=basic,price_overview&appids={}&cc=BR"
 ERROR_RESULT=InlineQueryResultArticle(id=uuid4(),
                 title="Error",hide_url=True,description=("Error: Sorry. Please report this with the /report command so we can fix it."),
                 input_message_content=InputTextMessageContent(parse_mode="Markdown",
