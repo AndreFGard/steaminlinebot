@@ -113,7 +113,8 @@ def scrapSteam(query, MAX_RESULTS, cacheApp: dict ={}):
 
 
 def makeInlineQueryResultArticle(result: GameResult):
-    return InlineQueryResultArticle(
+    try: 
+        return InlineQueryResultArticle(
                 id=uuid4(),
                 title=result.title,
                 hide_url=True,
@@ -135,6 +136,7 @@ def makeInlineQueryResultArticle(result: GameResult):
                     )
                 ),
             )
+    except: return ERROR_RESULT
 
 
 from bs4 import BeautifulSoup
