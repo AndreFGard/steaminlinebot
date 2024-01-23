@@ -92,14 +92,19 @@ def inlinequerySteamApi(update, context):
     
     try:
         gameResults = steamSearcher.getGameResultsSync((query,))
-        results = [result for result in gameResults if result]
-        if len(results) == 0:
-            results = [ERROR_RESULT]
+        if len(gameResults) == 0:
+            gameResults = [ERROR_RESULT]
     except:
-        results = [ERROR_RESULT]
+        gameResults = [ERROR_RESULT]
 
 
-    telegramResultArticles =  tuple(map(modules.makeInlineQueryResultArticle, gameResults))
+    telegramResultArticles =  list(map(modules.makeInlineQueryResultArticle, gameResults))
+    for idx,game in enumerate(telegramResultArticles):
+        if not game:
+            #move errored result to the end of the list
+            telegramResultArticles.pop(idx)
+            telegramResultArticles.append(modules.ERROR_RESULT)
+                
     start_uploading = time.time()
     update.inline_query.answer(telegramResultArticles, cache_time=30)
     end = time.time()

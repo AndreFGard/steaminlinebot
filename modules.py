@@ -9,7 +9,7 @@ API_APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails?filters=bas
 ERROR_RESULT=InlineQueryResultArticle(id=uuid4(),
                 title="Error",hide_url=True,description=("Error: Sorry. Please report this with the /report command so we can fix it."),
                 input_message_content=InputTextMessageContent(parse_mode="Markdown",
-                message_text=("Error: Sorry. Please report this with the /report command so we can fix it."),),)
+                message_text=("Error: Something has gone wrong here. Please report this with the /report command so I can fix it."),),)
 
 
 class cachev0:
@@ -76,7 +76,7 @@ class GameResult:
                 print(f"{title}: {price} - {appid}")
                 return(GameResult(link, title, appid, itad_plain, price, discount, cacheStorage))
         except:
-            return ERROR_RESULT
+            return False
 
 import time
 from gazpacho import get, Soup
@@ -136,7 +136,7 @@ def makeInlineQueryResultArticle(result: GameResult):
                     )
                 ),
             )
-    except: return ERROR_RESULT
+    except: return False
 
 
 from bs4 import BeautifulSoup
