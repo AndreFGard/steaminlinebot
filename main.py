@@ -92,7 +92,6 @@ def inlinequerySteamApi(update, context):
     
     try:
         gameResults = steamSearcher.getGameResultsSync((query,))
-        gameResults = [result for result in gameResults if result]
         if len(gameResults) == 0:
             gameResults = [ERROR_RESULT]
     except:
