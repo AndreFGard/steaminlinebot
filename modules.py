@@ -124,7 +124,7 @@ def makeInlineQueryResultArticle(result: GameResult):
                 input_message_content=InputTextMessageContent(
                     parse_mode="Markdown",
                     #message_text=f"[{result.title}]({result.link})\nPrice:{result.price_formatted}" + (f"\nDiscount: -{discountToEmoji(result.discount)}%" if result.discount else ""), #https://cdn.akamai.steamstatic.com/steam/apps/{appid}/header.jpg? can be used in order to not show the game's description
-                    message_text=f"[{result.title}]({result.link})\nPrice: *{result.price}*" + (f"   *\[{result.discount}]*" if result.discount else  "")
+                    message_text=f"[{result.title}]({result.link})\nPrice: *{result.price}*" + (f"   [{result.discount}]" if result.discount else  "")
                 ),
                 reply_markup=InlineKeyboardMarkup(
                     (
@@ -200,3 +200,6 @@ class SteamSearcher:
         data = asyncio.run(self.makeGameResultsFromGameDetails(query))
         return data
 
+#debug
+# searcher = SteamSearcher(6, {})
+# results = searcher.getGameResultsSync("tarkov")
