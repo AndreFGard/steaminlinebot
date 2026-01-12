@@ -14,11 +14,9 @@ Inspired by the archewikibot
 from math import trunc
 import os
 import sys
-import requests
 import logging
 from uuid import uuid4
-from gazpacho import get, Soup
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from telegram.ext import Updater, InlineQueryHandler, CommandHandler
 from telegram import InlineQueryResultArticle, InputTextMessageContent
 import json
@@ -26,14 +24,11 @@ import modules
 import time
 
 MAX_RESULTS = 6
+import dotenv
+dotenv.load_dotenv()
 
+itad_key = ''
 
-itad_key = os.environ["ITAD_KEY"]
-try:
-    cacheApp = modules.cachev0("dict-steamappid-itadplain.json")
-except:
-    print("CACHE FILE NOT FOUND")
-    cacheApp = modules.cachev0("")
 
 ERROR_RESULT = modules.ERROR_RESULT 
 
@@ -45,53 +40,34 @@ ERROR_RESULT = modules.ERROR_RESULT
 
 # logger = logging.getLogger(__name__)
 
-class logger:
-    def critical(a):
-        print(a)
-    def error (a):
-        print(a)
-    def warning(a):
-        print(a)
 
-def start(update, context):
-    update.message.reply_text(
+async def start(update: Update, context):
+    return await update.message.reply_text( #type:ignore
         "This bot can search for steam games for you in in-line mode.\n/help for more info.",
     )
 
 
-def help(update, context):
-    update.message.reply_text(
-        """To search with this bot, type @Steaminlinebot and then something you want to search in the message box. for example:
-@Steaminlinebot Skyrim
-or
-@steaminlinebot Stardew Valley""",
+async def help(update: Update, context):
+    return await update.message.reply_text( #type:ignore
+        "To search with this bot, type @Steaminlinebot and then something " 
+        "you want to search in the message box. for example:\n"
+        "@Steaminlinebot Skyrim\n"
+        "or\n"
+        "@steaminlinebot Stardew Valley",
     )
 
 
 
-def inlinequeryScraping(update, context):
-    query = update.inline_query.query
-    if len(query) < 3:
-        return
-    try:
-        telegramResults = modules.scrapSteam(query, MAX_RESULTS, cacheApp)
-        results = [result for result in telegramResults if result]
-        if len(results) == 0:
-            results = [ERROR_RESULT]
-    except:
-        results = [ERROR_RESULT]
-    update.inline_query.answer(results, cache_time=30)
 
-
-steamSearcher = modules.SteamSearcher(MAX_RESULTS, cacheApp.storage)
-def inlinequerySteamApi(update, context):
+steamSearcher = modules.SteamSearcher(MAX_RESULTS)
+async def inlinequerySteamApi(update: Update, context):
     start = time.time()
-    query = update.inline_query.query
+    query = update.inline_query.query #type:ignore
     if len(query) < 3:
         return
     
     try:
-        gameResults = steamSearcher.getGameResultsSync((query,))
+        gameResults = await steamSearcher.makeGameResultsFromGameDetails(query)
         if len(gameResults) == 0:
             gameResults = [ERROR_RESULT]
     except:
@@ -104,9 +80,9 @@ def inlinequerySteamApi(update, context):
             #move errored result to the end of the list
             telegramResultArticles.pop(idx)
             telegramResultArticles.append(modules.ERROR_RESULT)
-                
+    results = list(filter(lambda x: isinstance(x, InlineQueryResultArticle), telegramResultArticles))
     start_uploading = time.time()
-    update.inline_query.answer(telegramResultArticles, cache_time=30)
+    await update.inline_query.answer(results, cache_time=30)
     end = time.time()
     print(f"took {(start_uploading - start):.4f}s + {(end - start_uploading):.4f}s")
 
@@ -114,7 +90,7 @@ def inlinequerySteamApi(update, context):
 INLINEQUERYFUNC = inlinequerySteamApi
 
 def error(update, context):
-    logger.warning(f"Update {update} caused error {context.error}")
+    print(f"Update {update} caused error {context.error}")
 
 
 def main():
@@ -122,30 +98,26 @@ def main():
     try:
         token = os.environ["BOT_TOKEN"]
     except KeyError:
-        logger.critical("No BOT_TOKEN environment variable passed. Terminating.")
+        print("No BOT_TOKEN environment variable passed. Terminating.")
         sys.exit(1)
-    updater = Updater(token)
-
-    # Get the dispatcher to register handlers
-    dp = updater.dispatcher
+    
+    from telegram.ext import Application
+    
+    # Create the Application
+    application = Application.builder().token(token).build()
 
     # on different commands - answer in Telegram
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(CommandHandler("help", help))
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("help", help))
 
     # on noncommand i.e message - echo the message on Telegram
-    dp.add_handler(InlineQueryHandler(INLINEQUERYFUNC))
+    application.add_handler(InlineQueryHandler(INLINEQUERYFUNC))
 
     # log all errors
-    dp.add_error_handler(error)
+    application.add_error_handler(error)
 
     # Start the Bot
-    updater.start_polling()
-
-    # Block until the user presses Ctrl-C or the process receives SIGINT,
-    # SIGTERM or SIGABRT. This should be used most of the time, since
-    # start_polling() is non-blocking and will stop the bot gracefully.
-    updater.idle()
+    application.run_polling()
 
 
 if __name__ == "__main__":
