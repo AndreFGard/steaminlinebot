@@ -5,6 +5,7 @@ anyio==4.12.1
 attrs==25.4.0
 beautifulsoup4==4.14.3
 certifi==2026.1.4
+dotenv==0.9.9
 frozenlist==1.8.0
 gazpacho==1.1
 h11==0.16.0
@@ -13,6 +14,7 @@ httpx==0.28.1
 idna==3.11
 multidict==6.7.0
 propcache==0.4.1
+python-dotenv==1.2.1
 python-telegram-bot==22.5
 soupsieve==2.8.1
 typing_extensions==4.15.0
