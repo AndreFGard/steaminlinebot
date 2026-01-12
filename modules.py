@@ -69,14 +69,16 @@ class GameResult:
                 price = 0.0
                 if data['is_free'] or 'price_overview' not in data:
                     price = 0.0
-                    discount = False
+                    discount = None
                 else:
                     price = data['price_overview']['final_formatted']
-                    discount = discount = "-" + str(data['price_overview']['discount_percent']) + "%"
+                    discountAmount = float(str(data['price_overview']['discount_percent']))
+                    discount = f"-{discountAmount:.2f}%" if discountAmount > 0 else ''
                 print(f"{title}: {price} - {appid}")
                 return(GameResult(link, title, appid, itad_plain, price, discount, cacheStorage))
-        except:
-            return False
+        except Exception as e:
+            print(f"Error in makeGameResultFromSteamApiGameDetails: {e}")
+            return None
 
 import time
 from gazpacho import get, Soup
