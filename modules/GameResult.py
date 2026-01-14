@@ -13,32 +13,37 @@ class GameResult:
     discount: Optional[str]
     protonDBReport: Optional[ProtonDBReport] = None
 
+
     @staticmethod
     def makeGameResultFromSteamApiGameDetails(gamedetails:dict, protonDBReport:Optional[ProtonDBReport] = None):
         try:
             appid: str = tuple(gamedetails.keys())[0]
 
-            if gamedetails[appid]['success']:
-                data = gamedetails[appid]['data']
-                title = data['name']
-                link = f"https://store.steampowered.com/app/{appid}/"
+            if not gamedetails[appid]['success']:
+                raise Exception(f"Unsuccessful gamedetails result: {gamedetails}")
+
+            link = f"https://store.steampowered.com/app/{appid}/"
+            data = gamedetails[appid]['data']
+            title = data['name']
+
+            if data['is_free'] or 'price_overview' not in data:
                 price = 0.0
-                if data['is_free'] or 'price_overview' not in data:
-                    price = 0.0
+                discount = None
+            else:
+                price = data['price_overview']['final_formatted']
+                if price == 0.0:
                     discount = None
                 else:
-                    price = data['price_overview']['final_formatted']
-                    if price == 0.0:
-                        discount = None
-                    else:
-                        discountAmount = float(str(data['price_overview']['discount_percent']))
-                        discount = f"-{discountAmount:.2f}%" if discountAmount > 0 else None
+                    discountAmount = float(str(data['price_overview']['discount_percent']))
+                    discount = f"-{discountAmount:.2f}%" if discountAmount > 0 else None
 
-                return(GameResult(link=link, title=title, appid=appid, price=price, discount=discount, protonDBReport=protonDBReport))
+            return(GameResult(link=link, title=title, appid=appid, price=price, discount=discount, protonDBReport=protonDBReport))
+
         except Exception as e:
-            logging.info(f"Error in makeGameResultFromSteamApiGameDetails: {e}")
+            logging.warning(f"Error in makeGameResultFromSteamApiGameDetails: {e}")
             return None
         
+
     def __repr__(self):
         return str({
                     'link': self.link,
