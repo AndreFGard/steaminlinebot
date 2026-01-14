@@ -1,0 +1,12 @@
+version: "3.9"
+
+services:
+  bot:
+    build: .
+    container_name: python-bot
+    working_dir: /bot
+    volumes:
+      - ./data:/bot/data
+    command: >
+      sh -c "python main.py 2>> /bot/data/errors.log"
+    restart: unless-stopped
