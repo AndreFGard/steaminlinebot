@@ -1,17 +1,19 @@
-import json
 from typing import Iterable, Optional, Union
 from attr import dataclass
-import gazpacho
 from gazpacho.soup import Soup
-from telegram import InlineQueryResultArticle, InputTextMessageContent
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton
-from uuid import uuid4
+from modules import ProtonDB
+from bs4 import BeautifulSoup
+import aiohttp
+import asyncio
+from urllib.parse import quote_plus
+import time
+
 from modules.GameResult import GameResult
+from modules.async_lru_cache_ttl import async_lru_cache_ttl
+
+
 
 API_APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails?filters=basic,price_overview&appids={}&cc=BR"
-
-
-import time
 
 #WIP that uses the search endpoint rather than the appdetails one
 async def _scrapSteam(query, MAX_RESULTS, cacheApp: dict ={}):
@@ -55,11 +57,6 @@ async def _scrapSteam(query, MAX_RESULTS, cacheApp: dict ={}):
     results_building_end = time.time()
     return results
 
-from bs4 import BeautifulSoup
-import aiohttp
-import asyncio
-from urllib.parse import quote_plus
-
 @dataclass
 class ScrapeResult:
     found_error: Union[bool, Exception]
@@ -85,7 +82,7 @@ class SteamSearcher:
                 tasks.append(session.get(self.API_GAME_SEARCH, params=params))
 
             return await asyncio.gather(*tasks)
-
+    @async_lru_cache_ttl
     async def getAppids(self, gamenames: Iterable[str]):
         "analyzes html and returns dict of every appid found in the search for each given game name. empty keys (for now)"
         gamenames = [quote_plus(name) for name in gamenames]
@@ -120,9 +117,12 @@ class SteamSearcher:
         appids = tuple((await self.getAppids((query,))).keys())
 
         async with aiohttp.ClientSession() as session:
+            gamedetails, protondbs = (await self._getAllGameDetails(appids, session), await ProtonDB.ProtonDBReportFactory.getReports(appids))
+            #hopefully, their order is the same
+            
             raw_results = [
-                GameResult.makeGameResultFromSteamApiGameDetails(gameDetail)
-                for gameDetail in (await self._getAllGameDetails(appids, session))
+                GameResult.makeGameResultFromSteamApiGameDetails(gameDetail, protonDBReport=protondb)
+                for gameDetail,protondb in zip(gamedetails, protondbs)
             ]
             return ScrapeResult((None in raw_results), [result for result in raw_results if result is not None])
 
