@@ -1,28 +1,19 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-#
-# Telegram bot for searching through Steam and protondb pages
 # This program is dedicated to the public domain under the GPL3 license.
 
-"""
-Inspired by the archewikibot
-"""
 """
 @Steaminlinebot written by GuaximFsg (now AndreFGard) on github
 """
 
 from functools import cache
-from math import trunc
 import os
 import sys
+from logging import basicConfig,WARNING,INFO,DEBUG
 import logging
-from typing import Callable
-from uuid import uuid4
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from telegram.ext import Updater, InlineQueryHandler, CommandHandler
 from telegram import InlineQueryResultArticle, InputTextMessageContent
-import json
-import modules
+
 import time
 from telegram.ext import Application
 
@@ -32,7 +23,13 @@ from modules.SteamSearcher import SteamSearcher
 
 import dotenv
 dotenv.load_dotenv()
+logLevel =  {""}
 
+basicConfig(
+    level={"WARNING": WARNING, "INFO": INFO,
+        "DEBUG":DEBUG, None: WARNING}[os.environ.get("LOG_LEVEL")],
+    format="[%(levelname)s] %(asctime)s  %(name)s: %(message)s",
+)
 
 async def start(update: Update, context):
     return await update.message.reply_text( #type:ignore
@@ -61,10 +58,12 @@ class Bot:
 
     async def handleInlineQuery(self, update: Update, context):
         query = update.inline_query.query #type:ignore
+        logging.warning(update)
         start = time.time()
         
         specialResults = set()
         results =[]
+        gameResults = []
         if len(query) < 3:
                 specialResults.add(TOO_SHORT_RESULT)
         else:
@@ -94,6 +93,7 @@ class Bot:
         updateTime = time.time()
         await update.inline_query.answer(results + list(specialResults), cache_time=30) #type:ignore
         endTime = time.time()
+        logging.warning(f"RESULTS : {gameResults}")
         print(f"LOG: scrape time: {(updateTime - start):.4f}s, totalTime: {(endTime - start):.4f}s")
                 
 
@@ -103,7 +103,6 @@ def error(update: Update, context):
 
 
 def main():
-    # Create the Updater and pass it your bot's token.
     try:
         token = os.environ["BOT_TOKEN"]
     except KeyError:
@@ -111,7 +110,6 @@ def main():
         sys.exit(1)
     
     bot = Bot()
-
 
     # Create the Application
     application = Application.builder().token(token).build()
@@ -124,11 +122,10 @@ def main():
     application.add_handler(InlineQueryHandler(bot.handleInlineQuery))
 
     # log all errors
-    application.add_error_handler(error)
+    application.add_error_handler(error) #type:ignore
     
     # Start the Bot
     application.run_polling()
-
 
 
 
