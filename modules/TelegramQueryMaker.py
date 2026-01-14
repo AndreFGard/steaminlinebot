@@ -43,7 +43,7 @@ class TelegramInlineQueryMaker(InlineQueryMaker):
         try:
             # Build description
             description = (
-                f"Price: {"FREE" if not float(result.price) else result.price}"
+                f"Price: {"FREE" if not result.price else result.price}"
             )
 
             if result.discount:
@@ -51,7 +51,7 @@ class TelegramInlineQueryMaker(InlineQueryMaker):
 
             message_text = (
                 f"[{result.title}]({result.link})\n"
-                f"Price: *{result.price}*"
+                f"Price: {"FREE" if not result.price else result.price}"
                 + (f"   [{result.discount}]" if result.discount else "")
             )
 

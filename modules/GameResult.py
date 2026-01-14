@@ -9,7 +9,7 @@ class GameResult:
     link: str
     title: str
     appid: str
-    price: float
+    price: str
     discount: Optional[str]
     protonDBReport: Optional[ProtonDBReport] = None
 
@@ -25,17 +25,22 @@ class GameResult:
             link = f"https://store.steampowered.com/app/{appid}/"
             data = gamedetails[appid]['data']
             title = data['name']
-
+            
+            discount = None
             if data['is_free'] or 'price_overview' not in data:
-                price = 0.0
+                price = None
                 discount = None
             else:
-                price = data['price_overview']['final_formatted']
-                if price == 0.0:
-                    discount = None
-                else:
-                    discountAmount = float(str(data['price_overview']['discount_percent']))
-                    discount = f"-{discountAmount:.2f}%" if discountAmount > 0 else None
+                price = str(data['price_overview']['final_formatted'])
+                try: 
+                    if float(price.split()[1].replace(",",".")) == 0.0:
+                        price = None
+                        discount = None
+                    else:
+                        discountAmount = float(str(data['price_overview']['discount_percent']))
+                        discount = f"-{discountAmount:.2f}%" if discountAmount > 0 else None
+                except Exception as e:
+                    logging.warning(f"Price parsing error: {e}")
 
             return(GameResult(link=link, title=title, appid=appid, price=price, discount=discount, protonDBReport=protonDBReport))
 
