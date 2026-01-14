@@ -25,29 +25,36 @@ class TelegramInlineQueryMaker(InlineQueryMaker):
     @staticmethod
     def _discountToEmoji(discount: str):
         return TelegramInlineQueryMaker._digitsToEmoji(discount[1:-1])
+
     @staticmethod
-    def _tierToEmoji(tier:str):
-        return dict({
-            "gold": "✔️(4/5)",
-            "silver" : "✔️(3/5)" ,
-            "bronze": "🟡(2/5)",
-            "platinum": "✅(5/5)",
-            "borked":  "❌ (1/5)" })[tier.lower()]
+    def _tierToEmoji(tier: str):
+        return dict(
+            {
+                "gold": "✔️(4/5)",
+                "silver": "✔️(3/5)",
+                "bronze": "🟡(2/5)",
+                "platinum": "✅(5/5)",
+                "borked": "❌ (1/5)",
+            }
+        )[tier.lower()]
+
     @staticmethod
     def makeInlineQueryResultArticle(result: GameResult):
         try:
             # Build description
-            description = f"Price: {result.price}"
+            description = (
+                f"Price: {"FREE" if not float(result.price) else result.price}"
+            )
 
             if result.discount:
                 description += f"   [{result.discount}]"
 
-            
             message_text = (
-                        f"[{result.title}]({result.link})\n"
-                        f"Price: *{result.price}*"
-                        + (f"   [{result.discount}]" if result.discount else "")
-                    )
+                f"[{result.title}]({result.link})\n"
+                f"Price: *{result.price}*"
+                + (f"   [{result.discount}]" if result.discount else "")
+            )
+
             if result.protonDBReport is not None:
                 tier = result.protonDBReport.tier
                 message_text += (
@@ -78,10 +85,9 @@ class TelegramInlineQueryMaker(InlineQueryMaker):
                         ),
                         [
                             InlineKeyboardButton(
-                                "Historico de preços",
+                                "Price History",
                                 url=(
-                                    f"https://isthereanydeal.com/game/"
-                                    f"{result.itad_plain}/info/"
+                                    f"https://steamdb.info/app/{result.appid}/#pricehistory"
                                 ),
                             )
                         ],

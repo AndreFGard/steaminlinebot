@@ -12,11 +12,11 @@ from modules.GameResult import GameResult
 from modules.async_lru_cache_ttl import async_lru_cache_ttl
 
 
-
 API_APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails?filters=basic,price_overview&appids={}&cc=BR"
 
-#WIP that uses the search endpoint rather than the appdetails one
-async def _scrapSteam(query, MAX_RESULTS, cacheApp: dict ={}):
+
+# WIP that uses the search endpoint rather than the appdetails one
+async def _scrapSteam(query, MAX_RESULTS, cacheApp: dict = {}):
     results = []
     req_start_T = time.time()
     prefix = "https://store.steampowered.com/search/?term="
@@ -24,18 +24,18 @@ async def _scrapSteam(query, MAX_RESULTS, cacheApp: dict ={}):
         return
     query = quote_plus(query)  # Properly URI-encode the query string
     async with aiohttp.ClientSession() as session:
-                async with session.get(prefix + query + "&cc=US") as response:
-                    page = await response.text()
+        async with session.get(prefix + query + "&cc=US") as response:
+            page = await response.text()
 
     download_end = time.time()
     html = Soup(page)
-    #filtering for data-ds-appids results in not showing bundles, requiring
+    # filtering for data-ds-appids results in not showing bundles, requiring
     # appropriate filtering in the pricetags too, which is not implemented
     tags = html.find("a", {"data-ds-tagids": ""}, mode="all")
-    
+
     if not tags:
         return []
-    
+
     if not isinstance(tags, list):
         tags = [tags]
 
@@ -43,30 +43,32 @@ async def _scrapSteam(query, MAX_RESULTS, cacheApp: dict ={}):
         # Extract game data from tag - you need to implement the actual parsing logic
         # For now, this is a placeholder that needs to be replaced with actual scraping
         try:
-            appid = tag.attrs.get('data-ds-appid', '') #type:ignore
+            appid = tag.attrs.get("data-ds-appid", "")  # type:ignore
             if appid:
                 # Fetch game details from API instead
                 pass
         except:
             continue
-    results_building_end = time.time()    
-    results_buinding_total = results_building_end - download_end 
-    req_t =  download_end - req_start_T 
+    results_building_end = time.time()
+    results_buinding_total = results_building_end - download_end
+    req_t = download_end - req_start_T
     print(f"answer building total time: {req_t + results_buinding_total}:")
     print(f"\tpage download Time: {req_t}")
     results_building_end = time.time()
     return results
+
 
 @dataclass
 class ScrapeResult:
     found_error: Union[bool, Exception]
     results: list[GameResult]
 
+
 class SteamSearcher:
     def __init__(self, MAX_RESULTS):
         self.MAX_RESULTS = MAX_RESULTS
         self.API_GAME_SEARCH = "https://store.steampowered.com/search/suggest"
-        self.API_APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails?filters=basic,price_overview&appids={}&cc=BR"
+        self.API_APP_DETAILS_URL = API_APP_DETAILS_URL
 
     async def _getGamesHtml(self, gamenames: Iterable[str]):
         async with aiohttp.ClientSession() as session:
@@ -77,23 +79,24 @@ class SteamSearcher:
                     "f": "games",
                     "cc": "BR",
                     "realm": 1,
-                    "l": "english"
+                    "l": "english",
                 }
                 tasks.append(session.get(self.API_GAME_SEARCH, params=params))
 
             return await asyncio.gather(*tasks)
+
     @async_lru_cache_ttl
     async def getAppids(self, gamenames: Iterable[str]):
         "analyzes html and returns dict of every appid found in the search for each given game name. empty keys (for now)"
         gamenames = [quote_plus(name) for name in gamenames]
 
         responses = await self._getGamesHtml(gamenames)
-        
+
         appids = {}
         for response in responses:
             html_content = await response.text()
-            soup = BeautifulSoup(html_content, 'html.parser')
-            for l in soup.find_all('a'):
+            soup = BeautifulSoup(html_content, "html.parser")
+            for l in soup.find_all("a"):
                 if l.has_attr("data-ds-appid"):
                     appids[l["data-ds-appid"]] = ""
         return appids
@@ -105,28 +108,40 @@ class SteamSearcher:
 
     async def _getAllGameDetails(self, appids, session):
         """gets game details for each given appid and returns list with every response's json"""
-        tasks =[asyncio.create_task(self._getGameDetailsFromAppid(appid, session)) for appid in appids]
+        tasks = [
+            asyncio.create_task(self._getGameDetailsFromAppid(appid, session))
+            for appid in appids
+        ]
         results = await asyncio.gather(*tasks)
         return results
 
-    async def scrapeGameResults(self, query:str) -> ScrapeResult:
+    async def scrapeGameResults(self, query: str) -> ScrapeResult:
         """gets game details for each appid found in the search for the given
-          query(game name) and makes GameResult obj from each of those and returns a list of them all"""
-        
-        query = quote_plus(query) 
+        query(game name) and makes GameResult obj from each of those and returns a list of them all
+        """
+
+        query = quote_plus(query)
         appids = tuple((await self.getAppids((query,))).keys())
 
         async with aiohttp.ClientSession() as session:
-            gamedetails, protondbs = (await self._getAllGameDetails(appids, session), await ProtonDB.ProtonDBReportFactory.getReports(appids))
-            #hopefully, their order is the same
-            
+            gamedetails, protondbs = (
+                await self._getAllGameDetails(appids, session),
+                await ProtonDB.ProtonDBReportFactory.getReports(appids),
+            )
+            # hopefully, their order is the same
+
             raw_results = [
-                GameResult.makeGameResultFromSteamApiGameDetails(gameDetail, protonDBReport=protondb)
-                for gameDetail,protondb in zip(gamedetails, protondbs)
+                GameResult.makeGameResultFromSteamApiGameDetails(
+                    gameDetail, protonDBReport=protondb
+                )
+                for gameDetail, protondb in zip(gamedetails, protondbs)
             ]
-            return ScrapeResult((None in raw_results), [result for result in raw_results if result is not None])
+            return ScrapeResult(
+                (None in raw_results),
+                [result for result in raw_results if result is not None],
+            )
 
 
-#debug
+# debug
 # searcher = SteamSearcher(6, {})
 # results = searcher.getGameResultsSync("tarkov")
