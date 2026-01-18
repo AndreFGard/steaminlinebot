@@ -10,7 +10,8 @@ import time
 
 from modules.GameResult import GameResult
 from modules.async_lru_cache_ttl import async_lru_cache_ttl
-
+from urllib.parse import urlencode
+import logging
 
 API_APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails?filters=basic,price_overview&appids={}&cc=BR"
 
@@ -75,21 +76,23 @@ class SteamSearcher:
             tasks = []
             for gamename in gamenames:
                 params = {
-                    "term": gamename,
+                    "term": (gamename),
                     "f": "games",
                     "cc": "BR",
                     "realm": 1,
                     "l": "english",
                 }
-                tasks.append(session.get(self.API_GAME_SEARCH, params=params))
+                
+                logging.info(f"Searching games URL: {self.API_GAME_SEARCH}?{urlencode(params)}")
+
+                req = session.get(self.API_GAME_SEARCH, params=params)
+                tasks.append(req)
 
             return await asyncio.gather(*tasks)
 
     @async_lru_cache_ttl
     async def getAppids(self, gamenames: Iterable[str]):
         "analyzes html and returns dict of every appid found in the search for each given game name. empty keys (for now)"
-        gamenames = [quote_plus(name) for name in gamenames]
-
         responses = await self._getGamesHtml(gamenames)
 
         appids = {}
