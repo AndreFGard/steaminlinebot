@@ -38,7 +38,7 @@ class GameResult:
                         discount = None
                     else:
                         discountAmount = float(str(data['price_overview']['discount_percent']))
-                        discount = f"-{discountAmount:.2f}%" if discountAmount > 0 else None
+                        discount = f"-{discountAmount:.0f}%" if discountAmount > 0 else None
                 except Exception as e:
                     logging.warning(f"Price parsing error: {e}")
 
