@@ -13,7 +13,7 @@ from modules.async_lru_cache_ttl import async_lru_cache_ttl
 from urllib.parse import urlencode
 import logging
 
-API_APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails?filters=basic,price_overview&appids={}&cc=BR"
+API_APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails?filters=basic,price_overview&cc=BR"
 
 
 # WIP that uses the search endpoint rather than the appdetails one
@@ -106,7 +106,7 @@ class SteamSearcher:
 
     async def _getGameDetailsFromAppid(self, appid, session) -> dict:
         """makes steam api details request for given appid and returns future for it's json response"""
-        async with session.get(self.API_APP_DETAILS_URL.format(appid)) as r:
+        async with session.get(self.API_APP_DETAILS_URL, params={'appids':appid}) as r:
             return await r.json()
 
     async def _getAllGameDetails(self, appids, session):
@@ -123,7 +123,6 @@ class SteamSearcher:
         query(game name) and makes GameResult obj from each of those and returns a list of them all
         """
 
-        query = quote_plus(query)
         appids = tuple((await self.getAppids((query,))).keys())
 
         async with aiohttp.ClientSession() as session:
