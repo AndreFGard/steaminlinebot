@@ -13,7 +13,7 @@ from modules.async_lru_cache_ttl import async_lru_cache_ttl
 from urllib.parse import urlencode
 import logging
 
-API_APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails?filters=basic,price_overview&cc=BR"
+API_APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails?filters=basic,price_overview"
 
 
 # WIP that uses the search endpoint rather than the appdetails one
@@ -71,14 +71,14 @@ class SteamSearcher:
         self.API_GAME_SEARCH = "https://store.steampowered.com/search/suggest"
         self.API_APP_DETAILS_URL = API_APP_DETAILS_URL
 
-    async def _getGamesHtml(self, gamenames: Iterable[str]):
+    async def _getGamesHtml(self, gamenames: Iterable[str], country):
         async with aiohttp.ClientSession() as session:
             tasks = []
             for gamename in gamenames:
                 params = {
                     "term": (gamename),
                     "f": "games",
-                    "cc": "BR",
+                    "cc": country,
                     "realm": 1,
                     "l": "english",
                 }
@@ -91,9 +91,9 @@ class SteamSearcher:
             return await asyncio.gather(*tasks)
 
     @async_lru_cache_ttl
-    async def getAppids(self, gamenames: Iterable[str]):
+    async def getAppids(self, gamenames: Iterable[str],country):
         "analyzes html and returns dict of every appid found in the search for each given game name. empty keys (for now)"
-        responses = await self._getGamesHtml(gamenames)
+        responses = await self._getGamesHtml(gamenames, country)
 
         appids = {}
         for response in responses:
@@ -118,12 +118,12 @@ class SteamSearcher:
         results = await asyncio.gather(*tasks)
         return results
 
-    async def scrapeGameResults(self, query: str) -> ScrapeResult:
+    async def scrapeGameResults(self, query: str, country) -> ScrapeResult:
         """gets game details for each appid found in the search for the given
         query(game name) and makes GameResult obj from each of those and returns a list of them all
         """
 
-        appids = tuple((await self.getAppids((query,))).keys())
+        appids = tuple((await self.getAppids((query,), country)).keys())
 
         async with aiohttp.ClientSession() as session:
             gamedetails, protondbs = (

@@ -5,7 +5,7 @@ class InlineQueryMaker:
         self.scraper = scraper
 
 
-    async def scrapeQuery(self, query ):
-        return await self.scraper.scrapeGameResults(query)
+    async def scrapeQuery(self, query, country):
+        return await self.scraper.scrapeGameResults(query,country)
 
         

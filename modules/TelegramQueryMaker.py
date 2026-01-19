@@ -1,7 +1,9 @@
 from collections import defaultdict
 from telegram import (
     InlineKeyboardMarkup,
+    InlineQueryResult,
     InlineQueryResultArticle,
+    InlineQueryResultsButton,
     InputTextMessageContent,
     InlineKeyboardButton,
 )
@@ -101,6 +103,8 @@ class TelegramInlineQueryMaker(InlineQueryMaker):
                 f"(type: {type(e).__name__})"
             )
 
+
+CHANGE_CURRENCY_BUTTON = InlineQueryResultsButton(text="Change currency / hide this", start_parameter="changecurrency")
 
 ERROR_RESULT = InlineQueryResultArticle(
     id=str(uuid4()),
