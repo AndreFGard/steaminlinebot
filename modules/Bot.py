@@ -13,7 +13,7 @@ import logging
 import time
 
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
-from telegram.ext import Updater, InlineQueryHandler, CommandHandler
+from telegram.ext import InvalidCallbackData, Updater, InlineQueryHandler, CommandHandler
 from telegram import InlineQueryResultArticle, InputTextMessageContent
 
 from modules.db.UserRepository import UserRepository
@@ -32,7 +32,7 @@ class Bot:
         if not country:
             has_set = False
             for l in fallback_languages:
-                country = self.userRepo.get_country(l)
+                country = self.userRepo.get_country_by_language(l)
                 if country: break
 
         if not country: country = "US"
@@ -93,6 +93,69 @@ class Bot:
             f"LOG: scrape time: {(updateTime - start):.4f}s, totalTime: {(endTime - start):.4f}s"
         )
 
-    async def update_currency(self, update:Update):
-        id = update.effective_sender.id #type:ignore
-        update.message
+    async def set_currency(self, update: Update, context):
+            message = update.message
+            assert message and message.from_user
+            user_id = message.from_user.id
+            args = context.args 
+
+            #well formed message (/setcurrency COUNTRY_CODE)
+            if args:
+                requested_country = args[0].upper()
+                success = self.userRepo.upsert_user_country(user_id, requested_country)
+                
+                if success:
+                    await message.reply_text(f"✅ Success! Your currency has been set to {requested_country}.")
+                else:
+                    await message.reply_text(f"❌ Failed. '{requested_country}' is not a valid or supported country code.")
+                return
+
+            #empty message, recommend languages
+            user_lang = message.from_user.language_code or "en-us"
+            local_suggestion = self.userRepo.get_country_by_language(user_lang)
+            
+            target_codes = ["BR", "US", "MX", "PL"]
+            if local_suggestion and local_suggestion not in target_codes:
+                target_codes.insert(0, local_suggestion)
+
+            keyboard = []
+            for i in range(0, len(target_codes), 3):
+                row = [
+                    InlineKeyboardButton(code, callback_data=f"/setcurrency {code}") 
+                    for code in target_codes[i:i+3]
+                ]
+                keyboard.append(row)
+
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            explanation = (
+                "<b>How to set your currency:</b>\n"
+                "Use <code>/setcurrency CODE</code> (e.g., <code>/setcurrency US</code>).\n\n"
+                "Select one of the popular options below:"
+            )
+
+            await message.reply_text(
+                explanation, 
+                parse_mode="HTML", 
+                reply_markup=reply_markup
+            )
+
+
+    async def handle_currency_callback(self, update: Update, context):
+            query = update.callback_query
+            if not query or isinstance(query, InvalidCallbackData):
+                return
+
+            await query.answer() #stop spinning?
+            assert query.data
+
+            if query.data.startswith("/setcurrency "): 
+                country_code = query.data.replace("/setcurrency ", "").upper()
+                user_id = query.from_user.id
+                
+                success = self.userRepo.upsert_user_country(user_id, country_code)
+                
+                if success:
+                    await query.edit_message_text(f"✅ Currency set to *{country_code}*.", parse_mode="Markdown")
+                else:
+                    await query.edit_message_text(f"❌ Could not set currency to *{country_code}*.", parse_mode="Markdown")
