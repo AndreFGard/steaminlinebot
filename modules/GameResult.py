@@ -9,7 +9,7 @@ class GameResult:
     link: str
     title: str
     appid: str
-    price: str
+    price: str | None
     discount: Optional[str]
     protonDBReport: Optional[ProtonDBReport] = None
 
