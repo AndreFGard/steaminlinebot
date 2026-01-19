@@ -42,6 +42,6 @@ class UserRepository:
             return cur.rowcount == 1
         except sqlite3.IntegrityError as e:
             logging.error(f"upsert user country error: {e}")
-            return False
+            raise e
 
         

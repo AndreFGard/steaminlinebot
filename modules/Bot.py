@@ -102,8 +102,12 @@ class Bot:
             #well formed message (/setcurrency COUNTRY_CODE)
             if args:
                 requested_country = args[0].upper()
-                success = self.userRepo.upsert_user_country(user_id, requested_country)
-                
+
+                try:
+                    success = self.userRepo.upsert_user_country(user_id, requested_country)
+                except:
+                    success = False
+
                 if success:
                     await message.reply_text(f"✅ Success! Your currency has been set to {requested_country}.")
                 else:
@@ -153,9 +157,12 @@ class Bot:
                 country_code = query.data.replace("/setcurrency ", "").upper()
                 user_id = query.from_user.id
                 
-                success = self.userRepo.upsert_user_country(user_id, country_code)
-                
+                try:
+                    success = self.userRepo.upsert_user_country(user_id, country_code)
+                except:
+                    success = False
+
                 if success:
                     await query.edit_message_text(f"✅ Currency set to *{country_code}*.", parse_mode="Markdown")
                 else:
-                    await query.edit_message_text(f"❌ Could not set currency to *{country_code}*.", parse_mode="Markdown")
+                    await query.edit_message_text(f"❌ Could not set currency to *{country_code}*. Is it a valid country code?", parse_mode="Markdown")
