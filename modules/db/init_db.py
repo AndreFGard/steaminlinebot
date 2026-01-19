@@ -10,7 +10,7 @@ def init_db(path):
         """
         CREATE TABLE IF NOT EXISTS countries (
             language VARCHAR(5),
-            country VARCHAR(3) PRIMARY KEY
+            country VARCHAR(5) PRIMARY KEY
         );
 
         CREATE TABLE IF NOT EXISTS users (
