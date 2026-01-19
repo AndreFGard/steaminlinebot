@@ -1,5 +1,5 @@
 import sqlite3
-
+import logging
 class UserRepository:
     def __init__(self, db: sqlite3.Connection):
         self.db = db
@@ -12,29 +12,36 @@ class UserRepository:
         self.db.commit()
         return cur.rowcount
 
-    def get_country(self, language):
+    def get_country_by_language(self, language):
         row = self.db.execute(
             "SELECT country from countries where language = ?",
-            (language,),
+            (language.lower(),),
         ).fetchone()
         return row[0] if row else None
 
     def get_user_country(self, user_id: int) -> str | None:
         row = self.db.execute(
-            "SELECT country FROM users u inner join countries c on c.language = u.language WHERE id = ?",
+            "SELECT u.country from users u where id=?",
             (user_id,),
         ).fetchone()
         return row[0] if row else None
 
-    def upsert_language(self, user_id: int, language: str) -> None:
-        self.db.execute(
+    def upsert_user_country(self, user_id: int, country_code: str) -> bool:
+        cur = self.db.execute(
             """
-            INSERT INTO users (id, language)
+            INSERT INTO users (id, country)
             VALUES (?, ?)
             ON CONFLICT(id)
-            DO UPDATE SET language = excluded.language
+            DO UPDATE SET country = excluded.country
             """,
-            (user_id, language),
+            (user_id, country_code.upper()),
         )
-        self.db.commit()
-    
+
+        try:
+            self.db.commit()
+            return cur.rowcount == 1
+        except sqlite3.IntegrityError as e:
+            logging.error(f"upsert user country error: {e}")
+            return False
+
+        
