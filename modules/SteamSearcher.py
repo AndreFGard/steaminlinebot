@@ -71,7 +71,7 @@ class SteamSearcher:
         self.API_GAME_SEARCH = "https://store.steampowered.com/search/suggest"
         self.API_APP_DETAILS_URL = API_APP_DETAILS_URL
 
-    async def _getGamesHtml(self, gamenames: Iterable[str], country):
+    async def _getGameSugestions(self, gamenames: Iterable[str], country):
         async with aiohttp.ClientSession() as session:
             tasks = []
             for gamename in gamenames:
@@ -93,7 +93,7 @@ class SteamSearcher:
     @async_lru_cache_ttl
     async def getAppids(self, gamenames: Iterable[str],country):
         "analyzes html and returns dict of every appid found in the search for each given game name. empty keys (for now)"
-        responses = await self._getGamesHtml(gamenames, country)
+        responses = await self._getGameSugestions(gamenames, country)
 
         appids = {}
         for response in responses:
@@ -106,9 +106,13 @@ class SteamSearcher:
 
     async def _getGameDetailsFromAppid(self, appid, session) -> dict:
         """makes steam api details request for given appid and returns future for it's json response"""
-        async with session.get(self.API_APP_DETAILS_URL, params={'appids':appid}) as r:
+        params = {'appids':appid}
+        logging.info(f"Getting gamedetails json: {self.API_APP_DETAILS_URL}?{urlencode(params)}")
+
+        async with session.get(self.API_APP_DETAILS_URL, params=params) as r:
             return await r.json()
 
+    #we need this only to get discount data, as _getGame_sugestions doesnt have it
     async def _getAllGameDetails(self, appids, session):
         """gets game details for each given appid and returns list with every response's json"""
         tasks = [
@@ -126,9 +130,9 @@ class SteamSearcher:
         appids = tuple((await self.getAppids((query,), country)).keys())
 
         async with aiohttp.ClientSession() as session:
-            gamedetails, protondbs = (
-                await self._getAllGameDetails(appids, session),
-                await ProtonDB.ProtonDBReportFactory.getReports(appids),
+            gamedetails, protondbs = await asyncio.gather(
+                self._getAllGameDetails(appids, session),
+                ProtonDB.ProtonDBReportFactory.getReports(appids),
             )
             # hopefully, their order is the same
 
