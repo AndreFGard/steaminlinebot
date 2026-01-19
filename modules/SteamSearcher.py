@@ -104,19 +104,19 @@ class SteamSearcher:
                     appids[l["data-ds-appid"]] = ""
         return appids
 
-    async def _getGameDetailsFromAppid(self, appid, session) -> dict:
+    async def _getGameDetailsFromAppid(self, appid, country, session) -> dict:
         """makes steam api details request for given appid and returns future for it's json response"""
-        params = {'appids':appid}
+        params = {'appids':appid, "cc": country}
         logging.info(f"Getting gamedetails json: {self.API_APP_DETAILS_URL}?{urlencode(params)}")
 
         async with session.get(self.API_APP_DETAILS_URL, params=params) as r:
             return await r.json()
 
     #we need this only to get discount data, as _getGame_sugestions doesnt have it
-    async def _getAllGameDetails(self, appids, session):
+    async def _getAllGameDetails(self, appids, country, session):
         """gets game details for each given appid and returns list with every response's json"""
         tasks = [
-            asyncio.create_task(self._getGameDetailsFromAppid(appid, session))
+            asyncio.create_task(self._getGameDetailsFromAppid(appid, country, session))
             for appid in appids
         ]
         results = await asyncio.gather(*tasks)
@@ -131,7 +131,7 @@ class SteamSearcher:
 
         async with aiohttp.ClientSession() as session:
             gamedetails, protondbs = await asyncio.gather(
-                self._getAllGameDetails(appids, session),
+                self._getAllGameDetails(appids,country, session),
                 ProtonDB.ProtonDBReportFactory.getReports(appids),
             )
             # hopefully, their order is the same
