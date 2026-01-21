@@ -92,6 +92,18 @@ class Bot:
         print(
             f"LOG: scrape time: {(updateTime - start):.4f}s, totalTime: {(endTime - start):.4f}s"
         )
+        
+    async def delete_user_info(self, update:Update, context):
+        msg = update.message
+        assert msg and msg.from_user
+        id = msg.from_user.id
+        try:
+            self.userRepo.delete_user(id)
+            await msg.reply_text("Your data has been deleted 🫡")
+        except Exception as e:
+            logging.error(f"delete user error f{e}")
+            await msg.reply_text(f"Failed to delete your data. Please report with /report")
+
 
     async def set_currency(self, update: Update, context):
             message = update.message
@@ -111,7 +123,7 @@ class Bot:
                 if success:
                     await message.reply_text(f"✅ Success! Your currency has been set to {requested_country}.")
                 else:
-                    await message.reply_text(f"❌ Failed. '{requested_country}' is not a valid or supported country code.")
+                    await message.reply_text(f"❌ Could not set currency to *{requested_country}*. Is it a valid country code?", parse_mode="Markdown")
                 return
 
             #empty message, recommend languages
