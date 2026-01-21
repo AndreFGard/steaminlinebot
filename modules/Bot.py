@@ -73,7 +73,7 @@ class Bot:
                     except Exception as e:
                         print(f"LOG: ERROR: {e}")
                         specialResults.add(ERROR_RESULT)
-
+                
             except Exception as e:
                 print(f"LOG: Failed to query: {e}")
                 specialResults.add(ERROR_RESULT)  # type:ignore

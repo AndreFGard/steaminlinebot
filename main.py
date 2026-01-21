@@ -56,6 +56,7 @@ async def help(update: Update, context):
         "\nCurrency config:\n"
         "- /setcurrency COUNTRY_CODE\n"
         "EXAMPLE: /setcurrency US",
+        "\n\n Use /deleteinfo to delete your currency and userid from the system"
     )
 
 
@@ -82,6 +83,7 @@ def main():
     application.add_handler(InlineQueryHandler(bot.handleInlineQuery))
 
     application.add_handler(CommandHandler("setcurrency", bot.set_currency))
+    application.add_handler(CommandHandler("deleteinfo", bot.delete_user_info))
     application.add_handler(CallbackQueryHandler(bot.handle_currency_callback))
 
 

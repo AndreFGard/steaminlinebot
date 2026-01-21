@@ -34,7 +34,7 @@ class ProtonDBReportFactory:
         filtered: list[None|ProtonDBReport] = [
             x if isinstance(x, ProtonDBReport) else None for x in results]
         
-        for appid,r in filter(lambda x:isinstance(x[0], Exception), zip(results,appids)):
-            logging.info(f"Error in protondb report of appid {appid} {r}")
+        for result,appid in filter(lambda x:isinstance(x[0], Exception), zip(results,appids)):
+            logging.info(f"Error in protondb report of appid {appid}: {result}")
             
         return filtered
