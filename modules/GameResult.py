@@ -9,10 +9,28 @@ class GameResult:
     link: str
     title: str
     appid: str
-    price: str | None
+    price: Optional[str]
+    is_free: bool
     discount: Optional[str]
     protonDBReport: Optional[ProtonDBReport] = None
-
+    
+    @staticmethod
+    def _parseDiscount(priceStr, discountValue: int):
+        """Parses discounts in different locales"""
+        e = Exception()
+        for valueidx in [0,1]:
+            try: 
+                if float(priceStr.split()[valueidx].replace(",",".")) == 0.0:
+                    return None
+                else:
+                    if float(discountValue) == 0.0:
+                        return None
+                    discount = f"-{discountValue:.0f}%"
+                    return discount
+            except Exception as ee:
+                e = ee
+        logging.warning(f"Price parsing of price/discount: ('{priceStr}','{discountValue}') error: {e}")
+        return None
 
     @staticmethod
     def makeGameResultFromSteamApiGameDetails(gamedetails:dict, protonDBReport:Optional[ProtonDBReport] = None):
@@ -26,24 +44,22 @@ class GameResult:
             data = gamedetails[appid]['data']
             title = data['name']
             
+            has_price = False
+            is_free = False
             discount = None
-            if data['is_free'] or 'price_overview' not in data:
+
+            if data['is_free']:
+                is_free = True
+                price = None
+            elif 'price_overview' not in data:
                 price = None
                 discount = None
             else:
-                #will fallback to steam's own price
+                #This is a WIP, as the value position changes based on locales/countries
                 price = str(data['price_overview']['final_formatted'])
-                try: 
-                    if float(price.split()[0].replace(",",".")) == 0.0:
-                        price = None
-                        discount = None
-                    else:
-                        discountAmount = float(data['price_overview']['discount_percent'].split()[0])
-                        discount = f"-{discountAmount:.0f}%" if discountAmount > 0 else None
-                except Exception as e:
-                    logging.warning(f"Price parsing of price: '{data['price_overview']['final_formatted']}' error: {e}")
+                discount = GameResult._parseDiscount(price, data["price_overview"]["discount_percent"])
 
-            return(GameResult(link=link, title=title, appid=appid, price=price, discount=discount, protonDBReport=protonDBReport))
+            return(GameResult(link=link, title=title, appid=appid, price=price, discount=discount, protonDBReport=protonDBReport, is_free=is_free))
 
         except Exception as e:
             logging.warning(f"Error in makeGameResultFromSteamApiGameDetails: {e}")

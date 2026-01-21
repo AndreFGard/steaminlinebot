@@ -43,18 +43,21 @@ class TelegramInlineQueryMaker(InlineQueryMaker):
     @staticmethod
     def makeInlineQueryResultArticle(result: GameResult):
         try:
-            # Build description
-            description = (
-                f"Price: {"FREE" if not result.price else result.price}"
-            )
+
+            if result.is_free:
+                price_text = "Price: FREE"
+            elif result.price is not None:
+                price_text =f"Price: {result.price}"
+            else:
+                #possibly to be announced or just not sellable
+                price_text = ""
 
             if result.discount:
-                description += f"   [{result.discount}]"
+                price_text += f"\t[{result.discount}]"
 
             message_text = (
                 f"[{result.title}]({result.link})\n"
-                f"Price: {"FREE" if not result.price else result.price}"
-                + (f"   [{result.discount}]" if result.discount else "")
+                + price_text + '\n'
             )
 
             if result.protonDBReport is not None:
@@ -67,7 +70,7 @@ class TelegramInlineQueryMaker(InlineQueryMaker):
             return InlineQueryResultArticle(
                 id=str(uuid4()),
                 title=result.title,
-                description=description,
+                description=price_text,
                 thumbnail_url=(
                     f"https://cdn.akamai.steamstatic.com/steam/apps/"
                     f"{result.appid}/capsule_sm_120.jpg?t"
