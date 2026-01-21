@@ -31,16 +31,17 @@ class GameResult:
                 price = None
                 discount = None
             else:
+                #will fallback to steam's own price
                 price = str(data['price_overview']['final_formatted'])
                 try: 
-                    if float(price.split()[1].replace(",",".")) == 0.0:
+                    if float(price.split()[0].replace(",",".")) == 0.0:
                         price = None
                         discount = None
                     else:
-                        discountAmount = float(str(data['price_overview']['discount_percent']))
+                        discountAmount = float(data['price_overview']['discount_percent'].split()[0])
                         discount = f"-{discountAmount:.0f}%" if discountAmount > 0 else None
                 except Exception as e:
-                    logging.warning(f"Price parsing error: {e}")
+                    logging.warning(f"Price parsing of price: '{data['price_overview']['final_formatted']}' error: {e}")
 
             return(GameResult(link=link, title=title, appid=appid, price=price, discount=discount, protonDBReport=protonDBReport))
 
