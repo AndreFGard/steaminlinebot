@@ -1,7 +1,7 @@
 from typing import Iterable, Optional, Union
 from attr import dataclass
 from gazpacho.soup import Soup
-from modules import ProtonDB
+from modules.ProtonDBClient import ProtonDBClient
 from bs4 import BeautifulSoup
 import aiohttp
 import asyncio
@@ -122,7 +122,7 @@ class SteamSearcher:
         results = await asyncio.gather(*tasks)
         return results
 
-    async def scrapeGameResults(self, query: str, country) -> ScrapeResult:
+    async def scrapeGameResults(self, query: str, country:str) -> ScrapeResult:
         """gets game details for each appid found in the search for the given
         query(game name) and makes GameResult obj from each of those and returns a list of them all
         """
@@ -132,13 +132,13 @@ class SteamSearcher:
         async with aiohttp.ClientSession() as session:
             gamedetails, protondbs = await asyncio.gather(
                 self._getAllGameDetails(appids,country, session),
-                ProtonDB.ProtonDBReportFactory.getReports(appids),
+                ProtonDBClient.getReports(appids),
             )
             # hopefully, their order is the same
 
             raw_results = [
                 GameResult.makeGameResultFromSteamApiGameDetails(
-                    gameDetail, protonDBReport=protondb
+                    gameDetail, protonDBReport=protondb,country=country
                 )
                 for gameDetail, protondb in zip(gamedetails, protondbs)
             ]

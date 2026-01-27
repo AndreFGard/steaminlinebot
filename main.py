@@ -84,7 +84,7 @@ def main():
 
     application.add_handler(CommandHandler("setcurrency", bot.set_currency))
     application.add_handler(CommandHandler("deleteinfo", bot.delete_user_info))
-    application.add_handler(CallbackQueryHandler(bot.handle_currency_callback))
+    application.add_handler(CallbackQueryHandler(bot.callback_handler))
 
 
 

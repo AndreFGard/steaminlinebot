@@ -1,7 +1,7 @@
 from typing import Optional
 import logging
 
-from modules.ProtonDB import ProtonDBReport
+from modules.ProtonDBReport import ProtonDBReport
 from dataclasses import dataclass, field
 
 @dataclass
@@ -11,6 +11,7 @@ class GameResult:
     appid: str
     price: Optional[str]
     is_free: bool
+    country: Optional[str]
     discount: Optional[str]
     protonDBReport: Optional[ProtonDBReport] = None
     
@@ -33,7 +34,7 @@ class GameResult:
         return None
 
     @staticmethod
-    def makeGameResultFromSteamApiGameDetails(gamedetails:dict, protonDBReport:Optional[ProtonDBReport] = None):
+    def makeGameResultFromSteamApiGameDetails(gamedetails:dict, protonDBReport:Optional[ProtonDBReport] = None, country:Optional[str]=None):
         try:
             appid: str = tuple(gamedetails.keys())[0]
 
@@ -59,7 +60,7 @@ class GameResult:
                 price = str(data['price_overview']['final_formatted'])
                 discount = GameResult._parseDiscount(price, data["price_overview"]["discount_percent"])
 
-            return(GameResult(link=link, title=title, appid=appid, price=price, discount=discount, protonDBReport=protonDBReport, is_free=is_free))
+            return(GameResult(link=link, title=title, appid=appid, price=price, discount=discount, protonDBReport=protonDBReport, is_free=is_free, country=country))
 
         except Exception as e:
             logging.warning(f"Error in makeGameResultFromSteamApiGameDetails: {e}")
