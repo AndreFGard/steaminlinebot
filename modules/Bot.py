@@ -1,4 +1,6 @@
 from sqlite3 import Connection
+from types import CoroutineType
+from typing import Callable,Any, Coroutine, Mapping
 from modules.GameResult import GameResult
 from modules.TelegramQueryMaker import (
     CHANGE_CURRENCY_BUTTON,
@@ -25,6 +27,7 @@ class Bot:
         self.queryMaker = TelegramInlineQueryMaker(SteamSearcher(MAX_RESULTS=6))
         self.db = db
         self.userRepo = UserRepository(db)
+        self._callback_handlers: Mapping[str, Callable[[Update, Any], Coroutine[Any, Any, Any]]] = self._init_callback_handlers()
 
     def _get_country(self, id, fallback_languages=[]):
         country = self.userRepo.get_user_country(id)
@@ -106,6 +109,7 @@ class Bot:
 
 
     async def set_currency(self, update: Update, context):
+            """/setcurrency command, sending a keyboard, not callback"""
             message = update.message
             assert message and message.from_user
             user_id = message.from_user.id
@@ -155,9 +159,22 @@ class Bot:
                 parse_mode="HTML", 
                 reply_markup=reply_markup
             )
+    
+    def _init_callback_handlers(self):
+        handlers = {
+            "/setcurrency": self._handle_currency_callback,
+        }
+        self._callback_handlers = handlers
+        return self._callback_handlers
 
+    async def callback_handler(self, update: Update, context):
+        query = update.callback_query
+        if query and not isinstance(query, InvalidCallbackData):
+            await query.answer()
+            assert query.data
+            return await self._callback_handlers[query.data.split(" ")[0]](update, context)
 
-    async def handle_currency_callback(self, update: Update, context):
+    async def _handle_currency_callback(self, update: Update, context):
             query = update.callback_query
             if not query or isinstance(query, InvalidCallbackData):
                 return
@@ -165,8 +182,9 @@ class Bot:
             await query.answer() #stop spinning?
             assert query.data
 
+            country_code = "(NOT SET)"
             if query.data.startswith("/setcurrency "): 
-                country_code = query.data.replace("/setcurrency ", "").upper()
+                country_code = query.data.split(" ")[1].upper()
                 user_id = query.from_user.id
                 
                 try:
@@ -175,6 +193,6 @@ class Bot:
                     success = False
 
                 if success:
-                    await query.edit_message_text(f"✅ Currency set to *{country_code}*.", parse_mode="Markdown")
-                else:
-                    await query.edit_message_text(f"❌ Could not set currency to *{country_code}*. Is it a valid country code?", parse_mode="Markdown")
+                    return await query.edit_message_text(f"✅ Currency set to *{country_code}*.", parse_mode="Markdown")
+            
+            return await query.edit_message_text(f"❌ Could not set currency to '*{country_code}*'. Is it a valid country code?", parse_mode="Markdown")
