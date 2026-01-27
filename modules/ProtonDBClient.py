@@ -13,7 +13,7 @@ from modules.ProtonDBReport import ProtonDBReport
             
 
 
-class ProtonDBReportFactory:
+class ProtonDBClient:
     @staticmethod
     @async_lru_cache_ttl
     async def _getReport(appid: str):
@@ -27,7 +27,7 @@ class ProtonDBReportFactory:
     @staticmethod
     async def getReports(appids: Iterable[str]) -> list[None|ProtonDBReport]:
         results = await asyncio.gather(
-            *(ProtonDBReportFactory._getReport(appid) for appid in appids),
+            *(ProtonDBClient._getReport(appid) for appid in appids),
             return_exceptions=True,
         )
 
