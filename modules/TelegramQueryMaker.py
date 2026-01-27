@@ -29,19 +29,7 @@ class TelegramInlineQueryMaker(InlineQueryMaker):
         return TelegramInlineQueryMaker._digitsToEmoji(discount[1:-1])
 
     @staticmethod
-    def _tierToEmoji(tier: str):
-        return dict(
-            {
-                "gold": "✔️(4/5)",
-                "silver": "✔️(3/5)",
-                "bronze": "🟡(2/5)",
-                "platinum": "✅(5/5)",
-                "borked": "❌ (1/5)",
-            }
-        )[tier.lower()]
-
-    @staticmethod
-    def makeInlineQueryResultArticle(result: GameResult):
+    def makeInlineQueryResultArticle(result: GameResult): 
         try:
 
             if result.is_free:
@@ -64,7 +52,7 @@ class TelegramInlineQueryMaker(InlineQueryMaker):
                 tier = result.protonDBReport.tier
                 message_text += (
                     f"\nProtonDB Tier: {tier}"
-                    f"{TelegramInlineQueryMaker._tierToEmoji(tier)}"
+                    f"{tier.to_emoji}"
                 )
 
             return InlineQueryResultArticle(
@@ -106,6 +94,9 @@ class TelegramInlineQueryMaker(InlineQueryMaker):
                 f"(type: {type(e).__name__})"
             )
 
+            raise Exception(
+                f"Error in makeInlineQueryResultArticle: {e} "
+                f"(type: {type(e).__name__})")
 
 CHANGE_CURRENCY_BUTTON = InlineQueryResultsButton(text="Change currency / hide this", start_parameter="changecurrency")
 

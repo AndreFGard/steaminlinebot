@@ -1,5 +1,6 @@
 import asyncio
 from collections import deque
+from enum import IntEnum
 import heapq
 from dataclasses import dataclass
 import logging
@@ -9,11 +10,10 @@ from functools import wraps
 import time
  
 from modules.async_lru_cache_ttl import async_lru_cache_ttl
-from modules.ProtonDBReport import ProtonDBReport
+from modules.ProtonDBReport import ProtonDBReport, ProtonDBTier
             
-
-
 class ProtonDBClient:
+
     @staticmethod
     @async_lru_cache_ttl
     async def _getReport(appid: str):
@@ -22,7 +22,15 @@ class ProtonDBClient:
                 f"https://www.protondb.com/api/v1/reports/summaries/{appid}.json"
             ) as res:
                 res.raise_for_status()
-                return ProtonDBReport(**(await res.json()))
+                data = await res.json()
+                return ProtonDBReport(
+                    bestReportedTier=ProtonDBTier[data["bestReportedTier"].upper()],
+                    confidence=data["confidence"],
+                    score=data["score"],
+                    tier=ProtonDBTier[data["tier"].upper()],
+                    total=data["total"],
+                    trendingTier=ProtonDBTier[data["trendingTier"].upper()]
+                )
 
     @staticmethod
     async def getReports(appids: Iterable[str]) -> list[None|ProtonDBReport]:
