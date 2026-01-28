@@ -55,8 +55,9 @@ async def help(update: Update, context):
         f"{botname} Stardew Valley\n\n"
         "\nCurrency config:\n"
         "- /setcurrency COUNTRY_CODE\n"
-        "EXAMPLE: /setcurrency US",
-        "\n\n Use /deleteinfo to delete your currency and userid from the system"
+        "EXAMPLE: /setcurrency US"
+        "\n\n Use /deleteinfo to delete your currency and userid from the system",
+        parse_mode="Markdown"
     )
 
 
