@@ -8,11 +8,12 @@ class ProtonDBTier(IntEnum):
     SILVER = 3
     GOLD = 4
     PLATINUM = 5
-    
-    def __str__(self):
+
+    def label(self):
         return self.name.lower().capitalize()
     
-    __repr__ = __str__ 
+    def __str__(self):
+        return self.label() 
     
     def to_emoji(self):
         return {

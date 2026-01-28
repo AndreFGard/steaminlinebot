@@ -52,7 +52,7 @@ class TelegramInlineQueryMaker(InlineQueryMaker):
             if result.protonDBReport is not None:
                 tier = result.protonDBReport.tier
                 message_text += (
-                    f"\nProtonDB Tier: {tier}"
+                    f"\nProtonDB Tier: {tier.label()}"
                     f"{tier.to_emoji()}"
                 )
 
@@ -117,10 +117,10 @@ class TelegramInlineQueryMaker(InlineQueryMaker):
             if result.protonDBReport is not None:
                 tier = result.protonDBReport.tier
                 is_positive_trend = result.protonDBReport.trendingTier > result.protonDBReport.tier
-                trend_text = f"{tier}📈" if is_positive_trend else f"{tier}📉"
+                trend_text = f"{tier.label()}📈" if is_positive_trend else f"{tier.label()}📉"
 
                 message_text += (
-                    f"\nProtonDB Tier: *{tier}*"
+                    f"\nProtonDB Tier: *{tier.label()}*"
                     f"{tier.to_emoji()}"
                     f"\nTrending: {trend_text}"
                 )
@@ -161,9 +161,9 @@ class TelegramInlineQueryMaker(InlineQueryMaker):
             if result.protonDBReport is not None:
                 tier = result.protonDBReport.tier
                 is_positive_trend = result.protonDBReport.trendingTier > result.protonDBReport.tier
-                trend_text = f"{tier}📈" if is_positive_trend else f"{tier}📉"
+                trend_text = f"{tier.label()}📈" if is_positive_trend else f"{tier.label()}📉"
                 message_text += (
-                    f"\n[ProtonDB](https://www.protondb.com/app/{result.appid}) Tier: *{tier}*"
+                    f"\n[ProtonDB](https://www.protondb.com/app/{result.appid}) Tier: *{tier.label()}*"
                     f"{tier.to_emoji()}\t({result.protonDBReport.total} reports)"
                     f"\nTrending: {trend_text}"
                 )
