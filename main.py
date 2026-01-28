@@ -57,7 +57,6 @@ async def help(update: Update, context):
         "- /setcurrency COUNTRY_CODE\n"
         "EXAMPLE: /setcurrency US"
         "\n\n Use /deleteinfo to delete your currency and userid from the system",
-        parse_mode="Markdown"
     )
 
 
