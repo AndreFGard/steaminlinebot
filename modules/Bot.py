@@ -77,7 +77,8 @@ class Bot:
                     try:
                         #results.append(self.queryMaker.makeInlineQueryResultArticle(r))
                         resultId = self.gameResultRepo.insert_game_result(r)
-                        results.append(self.queryMaker.makeInlineQueryResultArticle_interactive(r, resultId))
+                        article,_,_ = self.queryMaker.makeInlineQueryResultArticle_interactive(r, resultId)
+                        results.append(article)
                     except Exception as e:
                         print(f"LOG: ERROR: {e} WITH RESULTS: {gameResults}")
                         specialResults.add(ERROR_RESULT)
@@ -169,7 +170,8 @@ class Bot:
         #this really must be refactored into an enum asap
         handlers = {
             "/setcurrency": self._handle_currency_callback,
-            "protondb_cb": self._handle_game_result_callback
+            "protondb_cb": self._handle_game_result_callback,
+            "overview_cb": self._handle_overview_callback,
         }
         self._callback_handlers = handlers
         return self._callback_handlers
@@ -224,8 +226,28 @@ class Bot:
             #     query.edit_message_text(text),
             #     query.edit_message_reply_markup(keyboardMarkup)
             # )
-            await query.edit_message_text(text)
+
+            #order seems to matter
+            await query.edit_message_text(text, parse_mode="markdown")
             await query.edit_message_reply_markup(keyboardMarkup)
+
+    async def _handle_overview_callback(self, update:Update, context):
+        query = update.callback_query
+        assert query and query.data
+        resultId = int(query.data.split(' ')[1])
+        gameResult = self.gameResultRepo.get_game_result(resultId)
+        assert gameResult
+        article,text,keyboardMarkup = TelegramInlineQueryMaker.makeInlineQueryResultArticle_interactive(
+            gameResult, resultId
+        )
+        #todo: refactor asap
+        await query.edit_message_text(text, parse_mode='markdown')
+        await query.edit_message_reply_markup(keyboardMarkup)
+
+        
+
+
+
 
                 
 

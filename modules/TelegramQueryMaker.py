@@ -132,6 +132,8 @@ class TelegramInlineQueryMaker(InlineQueryMaker):
                 hasProtonDB=result.protonDBReport is not None
             )
                         
+            #this must be refactored asap.
+            # at this point it's soldered rather than coupled
             return InlineQueryResultArticle(
                 id=str(uuid4()),
                 title=result.title,
@@ -145,7 +147,7 @@ class TelegramInlineQueryMaker(InlineQueryMaker):
                     message_text=message_text,
                 ),
                 reply_markup=keyboardMarkup
-            )
+            ),message_text, keyboardMarkup
 
         except Exception as e:
             raise Exception(
