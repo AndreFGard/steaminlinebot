@@ -14,10 +14,15 @@ from pydantic import BaseModel
 from modules.ProtonDBReport import ProtonDBReport, ProtonDBTier
 
 
+@dataclass
+class CountryConfig:
+    success: Optional[str]
+    alternative_suggestions: list[str]
+
+
 class UserCountry:
     def __init__(self, db:Connection):
         self._userRepo = UserRepository(db)
-
 
     def get_country(self, userId:int, fallback_languages=[]):
         country = self._userRepo.get_user_country(userId)
@@ -31,9 +36,22 @@ class UserCountry:
         if not country: country = "US"
         return (has_set,country )
 
-    async def setCountry(self, userId: int, country:str):
+    async def setCountry(self, userId: int, country:str, userLang:str):
         country = country.upper()
         try:
             success = self._userRepo.upsert_user_country(userId, country)
-        except:
+        except Exception as e :
             success = False
+            logging.error(f"setCountry errro: {e}")
+        if success:
+            return CountryConfig(country, [])
+        
+        #language based suggestion
+        suggestion = self._userRepo.get_country_by_language(userLang)
+        codes = {"PT", "PL", "BR", "US"}
+        if suggestion: codes.add(suggestion)
+        
+        return CountryConfig(None, list(reversed(list(codes))))
+        
+
+
