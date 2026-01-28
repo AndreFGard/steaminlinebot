@@ -1,4 +1,5 @@
 from collections import defaultdict
+from os import replace
 from telegram import (
     InlineKeyboardMarkup,
     InlineQueryResult,
@@ -52,7 +53,7 @@ class TelegramInlineQueryMaker(InlineQueryMaker):
                 tier = result.protonDBReport.tier
                 message_text += (
                     f"\nProtonDB Tier: {tier}"
-                    f"{tier.to_emoji}"
+                    f"{tier.to_emoji()}"
                 )
 
             return InlineQueryResultArticle(
@@ -93,11 +94,125 @@ class TelegramInlineQueryMaker(InlineQueryMaker):
                 f"Error in makeInlineQueryResultArticle: {e} "
                 f"(type: {type(e).__name__})"
             )
+    @staticmethod
+    def makeInlineQueryResultArticle_interactive(result: GameResult, resultId:int):
+        try:
 
+            if result.is_free:
+                price_text = "Price: FREE"
+            elif result.price is not None:
+                price_text =f"Price: {result.price}"
+            else:
+                #possibly to be announced or just not sellable
+                price_text = ""
+
+            if result.discount:
+                price_text += f"\t[{result.discount}]"
+
+            message_text = (
+                f"[{result.title}]({result.link})\n"
+                + price_text + '\n'
+            )
+
+            if result.protonDBReport is not None:
+                tier = result.protonDBReport.tier
+                is_positive_trend = result.protonDBReport.trendingTier > result.protonDBReport.tier
+                trend_text = f"{tier}📈" if is_positive_trend else f"{tier}📉"
+
+                message_text += (
+                    f"\nProtonDB Tier: *{tier}*"
+                    f"{tier.to_emoji()}"
+                    f"\nTrending: {trend_text}"
+                )
+
+            keyboardMarkup = TelegramInlineQueryMaker._makeKeyboardMarkup(
+                appid=result.appid,
+                steamlink=result.link,
+                resultId=resultId,
+                hasProtonDB=result.protonDBReport is not None
+            )
+                        
+            return InlineQueryResultArticle(
+                id=str(uuid4()),
+                title=result.title,
+                description=price_text,
+                thumbnail_url=(
+                    f"https://cdn.akamai.steamstatic.com/steam/apps/"
+                    f"{result.appid}/capsule_sm_120.jpg?t"
+                ),
+                input_message_content=InputTextMessageContent(
+                    parse_mode="Markdown",
+                    message_text=message_text,
+                ),
+                reply_markup=keyboardMarkup
+            )
+
+        except Exception as e:
             raise Exception(
                 f"Error in makeInlineQueryResultArticle: {e} "
-                f"(type: {type(e).__name__})")
+                f"(type: {type(e).__name__})"
+            )
+    @staticmethod
+    def makeProtonDBResultText(result: GameResult, resultId:int):
+        try:
+            message_text = ""
+            if result.protonDBReport is not None:
+                tier = result.protonDBReport.tier
+                is_positive_trend = result.protonDBReport.trendingTier > result.protonDBReport.tier
+                trend_text = f"{tier}📈" if is_positive_trend else f"{tier}📉"
+                message_text += (
+                    f"\nProtonDB Tier: *{tier}*"
+                    f"{tier.to_emoji()}\t({result.protonDBReport.total} reports)"
+                    f"\nTrending: {trend_text}"
+                )
 
+                keyboardMarkup = TelegramInlineQueryMaker._makeKeyboardMarkup(
+                    appid=result.appid,
+                    steamlink=result.link,
+                    resultId=resultId,
+                    hasProtonDB=True,
+                    replace_back="PROTONDB"
+                )
+                return message_text,keyboardMarkup
+            else:
+                return f"[ProtonDB](https://www.protondb.com/app/{result.appid}) info couldnt be fetched", InlineKeyboardMarkup([])
+        except Exception as e:
+            raise Exception(
+                f"Error in makeProtonDBResultText: {e} "
+                f"(type: {type(e).__name__})"
+            )
+    @staticmethod
+    def _makeKeyboardMarkup(appid, steamlink, resultId:int, hasProtonDB:bool, replace_back=None):
+        row1conts = {
+            "STEAM": InlineKeyboardButton("Steam Page", url=steamlink),
+            "PROTONDB": InlineKeyboardButton(
+                "ProtonDB 🐧",
+                #url=f"https://www.protondb.com/app/{result.appid}",
+                callback_data=f"protondb_cb {resultId}" #will call _handle_game_result_callback
+                )
+        }
+        row2conts = {"PRICEHISTORY": InlineKeyboardButton(
+            "Price History",url=(f"https://steamdb.info/app/{appid}/#pricehistory"))}
+        backButton = InlineKeyboardButton("Overview", callback_data=f"overview_cb {resultId}")
+        
+        replaceable: None|dict = None
+        if replace_back in row1conts:
+            replaceable = row1conts
+        elif replace_back in row2conts:
+            replaceable = row2conts
+        
+        if replaceable is not None:
+            replaceable[replace_back] = backButton
+        
+        if replaceable != row1conts and  not hasProtonDB:
+            row1conts.pop("PROTONDB")
+        
+        return InlineKeyboardMarkup([list(row1conts.values()), list(row2conts.values())])
+        
+        
+                
+
+    
 CHANGE_CURRENCY_BUTTON = InlineQueryResultsButton(text="Change currency / hide this", start_parameter="changecurrency")
 
 ERROR_RESULT = InlineQueryResultArticle(

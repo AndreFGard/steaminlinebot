@@ -1,7 +1,9 @@
+from collections import defaultdict
 from sqlite3 import Connection
 from types import CoroutineType
 from typing import Callable,Any, Coroutine, Mapping
 from modules.GameResult import GameResult
+import asyncio
 from modules.TelegramQueryMaker import (
     CHANGE_CURRENCY_BUTTON,
     TelegramInlineQueryMaker,
@@ -20,13 +22,14 @@ from telegram import InlineQueryResultArticle, InputTextMessageContent
 
 from modules.db.UserRepository import UserRepository
 
-
+from modules.db.GameResultRepository import GameResultRepository
 
 class Bot:
     def __init__(self, db:Connection):
         self.queryMaker = TelegramInlineQueryMaker(SteamSearcher(MAX_RESULTS=6))
         self.db = db
         self.userRepo = UserRepository(db)
+        self.gameResultRepo = GameResultRepository(db)
         self._callback_handlers: Mapping[str, Callable[[Update, Any], Coroutine[Any, Any, Any]]] = self._init_callback_handlers()
 
     def _get_country(self, id, fallback_languages=[]):
@@ -72,13 +75,15 @@ class Bot:
                 results: list[InlineQueryResultArticle] = []
                 for r in gameResults:
                     try:
-                        results.append(self.queryMaker.makeInlineQueryResultArticle(r))
+                        #results.append(self.queryMaker.makeInlineQueryResultArticle(r))
+                        resultId = self.gameResultRepo.insert_game_result(r)
+                        results.append(self.queryMaker.makeInlineQueryResultArticle_interactive(r, resultId))
                     except Exception as e:
-                        print(f"LOG: ERROR: {e}")
+                        print(f"LOG: ERROR: {e} WITH RESULTS: {gameResults}")
                         specialResults.add(ERROR_RESULT)
                 
             except Exception as e:
-                print(f"LOG: Failed to query: {e}")
+                print(f"LOG: Failed to query: {e} WITH RESULTS: {gameResults}")
                 specialResults.add(ERROR_RESULT)  # type:ignore
 
         updateTime = time.time()
@@ -161,8 +166,10 @@ class Bot:
             )
     
     def _init_callback_handlers(self):
+        #this really must be refactored into an enum asap
         handlers = {
             "/setcurrency": self._handle_currency_callback,
+            "protondb_cb": self._handle_game_result_callback
         }
         self._callback_handlers = handlers
         return self._callback_handlers
@@ -171,15 +178,20 @@ class Bot:
         query = update.callback_query
         if query and not isinstance(query, InvalidCallbackData):
             await query.answer()
-            assert query.data
-            return await self._callback_handlers[query.data.split(" ")[0]](update, context)
+            #fail silently
+            key = query.data.split(" ")[0] if query.data else "No callback data"
+
+            #todo: handle errors here
+            return await asyncio.gather(
+                self._callback_handlers[key](update, context),
+                query.answer()
+            )
 
     async def _handle_currency_callback(self, update: Update, context):
             query = update.callback_query
             if not query or isinstance(query, InvalidCallbackData):
                 return
 
-            await query.answer() #stop spinning?
             assert query.data
 
             country_code = "(NOT SET)"
@@ -191,8 +203,31 @@ class Bot:
                     success = self.userRepo.upsert_user_country(user_id, country_code)
                 except:
                     success = False
-
+                query.edit_message_reply_markup
                 if success:
                     return await query.edit_message_text(f"✅ Currency set to *{country_code}*.", parse_mode="Markdown")
             
             return await query.edit_message_text(f"❌ Could not set currency to '*{country_code}*'. Is it a valid country code?", parse_mode="Markdown")
+
+    async def _handle_game_result_callback(self, update: Update, context):
+        query = update.callback_query
+        assert query and query.data
+        
+        
+        if query.data.startswith("protondb_cb"):
+            resultId = int(query.data.split(' ')[1])
+            gameResult = self.gameResultRepo.get_game_result(resultId)
+            assert gameResult
+            protondb = gameResult.protonDBReport
+            text,keyboardMarkup = TelegramInlineQueryMaker.makeProtonDBResultText(gameResult, resultId)
+            # await asyncio.gather(
+            #     query.edit_message_text(text),
+            #     query.edit_message_reply_markup(keyboardMarkup)
+            # )
+            await query.edit_message_text(text)
+            await query.edit_message_reply_markup(keyboardMarkup)
+
+                
+
+
+        

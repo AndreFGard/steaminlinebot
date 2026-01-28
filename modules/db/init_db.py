@@ -18,6 +18,32 @@ def init_db(path):
             country VARCHAR(5) NOT NULL,
             FOREIGN KEY (country) REFERENCES countries(country)
         );
+
+
+        CREATE TABLE IF NOT EXISTS gameresults (
+            appid INTEGER,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            country TEXT,
+            link TEXT,
+            price TEXT,
+            is_free INTEGER,
+            discount TEXT,
+            date INTEGER
+        );
+
+        CREATE TABLE IF NOT EXISTS protondbresults (
+            appid INTEGER,
+            id INTEGER,
+            bestReportedTier TEXT,
+            confidence TEXT,
+            score REAL,
+            tier TEXT,
+            total INTEGER,
+            trendingTier TEXT,
+            PRIMARY KEY (id),
+            FOREIGN KEY (id)
+            REFERENCES gameresults (id)
+        );
         """
     )
 
