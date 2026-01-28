@@ -11,6 +11,17 @@ from telegram import (
 from modules.InlineQueryMaker import InlineQueryMaker
 from uuid import uuid4
 from modules.GameResult import GameResult
+from dataclasses import dataclass
+
+@dataclass
+class TelegramVM:
+    keyboard: InlineKeyboardMarkup
+    text: str
+    parse_mode: str
+
+    def __post_init__(self):
+        if self.parse_mode not in ["HTML", "Markdown"]:
+            raise ValueError("parse_mode must be either 'HTML' or 'Markdown'")
 
 
 class TelegramInlineQueryMaker:
@@ -27,71 +38,6 @@ class TelegramInlineQueryMaker:
     def _discountToEmoji(discount: str):
         return TelegramInlineQueryMaker._digitsToEmoji(discount[1:-1])
 
-    @staticmethod
-    def makeInlineQueryResultArticle(result: GameResult): 
-        try:
-
-            if result.is_free:
-                price_text = "Price: FREE"
-            elif result.price is not None:
-                price_text =f"Price: {result.price}"
-            else:
-                #possibly to be announced or just not sellable
-                price_text = ""
-
-            if result.discount:
-                price_text += f"\t[{result.discount}]"
-
-            message_text = (
-                f"[{result.title}]({result.link})\n"
-                + price_text + '\n'
-            )
-
-            if result.protonDBReport is not None:
-                tier = result.protonDBReport.tier
-                message_text += (
-                    f"\nProtonDB Tier: {tier.label()}"
-                    f"{tier.to_emoji()}"
-                )
-
-            return InlineQueryResultArticle(
-                id=str(uuid4()),
-                title=result.title,
-                description=price_text,
-                thumbnail_url=(
-                    f"https://cdn.akamai.steamstatic.com/steam/apps/"
-                    f"{result.appid}/capsule_sm_120.jpg?t"
-                ),
-                input_message_content=InputTextMessageContent(
-                    parse_mode="Markdown",
-                    message_text=message_text,
-                ),
-                reply_markup=InlineKeyboardMarkup(
-                    (
-                        (
-                            InlineKeyboardButton("Steam Page", url=result.link),
-                            InlineKeyboardButton(
-                                "ProtonDB 🐧",
-                                url=f"https://www.protondb.com/app/{result.appid}",
-                            ),
-                        ),
-                        [
-                            InlineKeyboardButton(
-                                "Price History",
-                                url=(
-                                    f"https://steamdb.info/app/{result.appid}/#pricehistory"
-                                ),
-                            )
-                        ],
-                    )
-                ),
-            )
-
-        except Exception as e:
-            raise Exception(
-                f"Error in makeInlineQueryResultArticle: {e} "
-                f"(type: {type(e).__name__})"
-            )
     @staticmethod
     def makeInlineQueryResultArticle_interactive(result: GameResult, resultId:int):
         try:
