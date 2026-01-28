@@ -228,7 +228,7 @@ class Bot:
             # )
 
             #order seems to matter
-            await query.edit_message_text(text, parse_mode="markdown")
+            await query.edit_message_text(text, parse_mode="Markdown")
             await query.edit_message_reply_markup(keyboardMarkup)
 
     async def _handle_overview_callback(self, update:Update, context):
@@ -241,7 +241,7 @@ class Bot:
             gameResult, resultId
         )
         #todo: refactor asap
-        await query.edit_message_text(text, parse_mode='markdown')
+        await query.edit_message_text(text, parse_mode='Markdown')
         await query.edit_message_reply_markup(keyboardMarkup)
 
         
