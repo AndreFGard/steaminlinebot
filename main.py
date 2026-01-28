@@ -19,7 +19,7 @@ import dotenv
 
 from modules.db import init_db
 from modules.GameResult import GameResult
-from modules.TelegramQueryMaker import (
+from modules.view.TelegramQueryMaker import (
     TelegramInlineQueryMaker,
     ERROR_RESULT,
     TOO_SHORT_RESULT,

@@ -4,7 +4,7 @@ from types import CoroutineType
 from typing import Callable,Any, Coroutine, Mapping
 from modules.GameResult import GameResult
 import asyncio
-from modules.TelegramQueryMaker import (
+from modules.view.TelegramQueryMaker import (
     CHANGE_CURRENCY_BUTTON,
     TelegramInlineQueryMaker,
     ERROR_RESULT,
