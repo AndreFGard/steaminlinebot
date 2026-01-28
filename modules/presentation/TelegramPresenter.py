@@ -13,9 +13,7 @@ from uuid import uuid4
 from modules.GameResult import GameResult
 
 
-class TelegramInlineQueryMaker(InlineQueryMaker):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+class TelegramInlineQueryMaker:
 
     @staticmethod
     def _digitsToEmoji(digit: str):

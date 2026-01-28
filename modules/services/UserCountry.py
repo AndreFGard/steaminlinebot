@@ -16,8 +16,9 @@ from modules.ProtonDBReport import ProtonDBReport, ProtonDBTier
 
 @dataclass
 class CountryConfig:
-    success: Optional[str]
-    alternative_suggestions: list[str]
+    configuredCountry: Optional[str]
+    """Might be None if unsuccessful"""
+    alternativeSuggestions: list[str]
 
 
 class UserCountry:
@@ -50,7 +51,7 @@ class UserCountry:
         suggestion = self._userRepo.get_country_by_language(userLang)
         codes = {"PT", "PL", "BR", "US"}
         if suggestion: codes.add(suggestion)
-        
+
         return CountryConfig(None, list(reversed(list(codes))))
         
 
