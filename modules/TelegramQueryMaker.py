@@ -163,7 +163,7 @@ class TelegramInlineQueryMaker(InlineQueryMaker):
                 is_positive_trend = result.protonDBReport.trendingTier > result.protonDBReport.tier
                 trend_text = f"{tier}📈" if is_positive_trend else f"{tier}📉"
                 message_text += (
-                    f"\nProtonDB Tier: *{tier}*"
+                    f"\n[ProtonDB](https://www.protondb.com/app/{result.appid}) Tier: *{tier}*"
                     f"{tier.to_emoji()}\t({result.protonDBReport.total} reports)"
                     f"\nTrending: {trend_text}"
                 )

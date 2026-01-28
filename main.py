@@ -61,7 +61,7 @@ async def help(update: Update, context):
 
 
 
-def error(update: Update, context):
+async def error(update: Update, context):
     print(f"Update {update} caused error {context.error}")
 
 
