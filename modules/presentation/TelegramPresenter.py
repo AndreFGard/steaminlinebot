@@ -1,5 +1,6 @@
 from collections import defaultdict
 from os import replace
+from typing import Optional
 from telegram import (
     InlineKeyboardMarkup,
     InlineQueryResult,
@@ -8,13 +9,18 @@ from telegram import (
     InputTextMessageContent,
     InlineKeyboardButton,
 )
+from modules import ProtonDBReport
 from modules.InlineQueryMaker import InlineQueryMaker
 from uuid import uuid4
 from modules.GameResult import GameResult
 from dataclasses import dataclass
 
+from modules.services import SearchGames
+from modules.services.SearchGames import GameResultVM, ProtonDBVM, SearchResults, SpecialResults
+from modules.services.UserCountry import CountryConfig, CountryModification
+
 @dataclass
-class TelegramVM:
+class TelegramPresentation:
     keyboard: InlineKeyboardMarkup
     text: str
     parse_mode: str
@@ -23,110 +29,123 @@ class TelegramVM:
         if self.parse_mode not in ["HTML", "Markdown"]:
             raise ValueError("parse_mode must be either 'HTML' or 'Markdown'")
 
+@dataclass
+class TelegramArticleInlineArticlePresentation(TelegramPresentation):
+    queryArticle: Optional[InlineQueryResultArticle]
+
+@dataclass
+class TelegramCountryPresentation(TelegramPresentation):
+    ...
+
+
+class TelegramCallbackBuilder:
+    @staticmethod
+    def setcurrency(countrycode):
+        return f"setcurrency {countrycode}"
 
 class TelegramInlineQueryMaker:
+    @staticmethod
+    def _presentProtonDBVM(protondb: ProtonDBVM|None):
+        if not protondb: return ''
+        tierEmoji = protondb.tier.to_emoji()
+
+        text = (
+            f"[ProtonDB Tier](https://www.protondb.com/app/{protondb.appid}): {str(protondb.tier)}"
+            f" {'📈' if protondb.positive_trend else '📉'}"
+            f"{tierEmoji}"
+            f"\t({protondb.totalReports} reports)"
+        )
+        return text
+    @staticmethod
+    def _gamePriceLine(game:GameResultVM):
+        price = (
+            "Price: FREE" if game.is_free else
+            f"Price: {game.price}" if game.price is not None else
+            "Not purchasable")
+        return price
+    @staticmethod
+    def _presentGameResultVM(game: GameResultVM):
+        price = TelegramInlineQueryMaker._gamePriceLine(game)
+        discount = f"\t[{game.discount}]" if game.discount is not None else ''
+
+        return (
+            f"[{game.title}]({game.link})" + '\n' +
+            price + discount + '\n' +
+            TelegramInlineQueryMaker._presentProtonDBVM(game.protonDB)
+        )
 
     @staticmethod
-    def _digitsToEmoji(digit: str):
-        emojis = ("0⃣", "1⃣", "2⃣", "3⃣", "4⃣", "5⃣", "6⃣", "7⃣", "8⃣", "9⃣")
-        answer = ""
-        for d in digit:
-            answer += emojis[int(d)]
-        return answer
+    def _makeInlineGameArticle(game: GameResultVM, countryConfig:CountryConfig):
+        keyboardMarkup = TelegramInlineQueryMaker._makeKeyboardMarkup(
+            appid=game.appid,
+            steamlink=game.link,
+            resultId=game.id,
+            hasProtonDB=game.protonDB is not None
+        )
+        
+        message_text = TelegramInlineQueryMaker._presentGameResultVM(game)
+
+
+        #this must be refactored asap.
+        # at this point it's soldered rather than coupled
+        queryResult= InlineQueryResultArticle(
+            id=str(uuid4()),
+            title=game.title,
+            description=TelegramInlineQueryMaker._gamePriceLine(game),
+            thumbnail_url=(
+                f"https://cdn.akamai.steamstatic.com/steam/apps/"
+                f"{game.appid}/capsule_sm_120.jpg?t"
+            ),
+            input_message_content=InputTextMessageContent(
+                parse_mode="Markdown",
+                message_text=message_text,
+            ),
+            reply_markup=keyboardMarkup
+        )
+
+        return TelegramArticleInlineArticlePresentation(
+            queryArticle = queryResult,
+            text=message_text,
+            keyboard=keyboardMarkup,
+            parse_mode='Markdown'
+        )
+    
+    @staticmethod
+    def _makeInlineQueryResultList(games:SearchResults):
 
     @staticmethod
-    def _discountToEmoji(discount: str):
-        return TelegramInlineQueryMaker._digitsToEmoji(discount[1:-1])
+    def _makeCountryKeyboard(codes:list[str]):
+        keyboard = []
+        for i in range(0, len(codes), 3):
+            row = [
+                InlineKeyboardButton(code, callback_data=TelegramCallbackBuilder.setcurrency(code))
+                for code in codes[i:i+3]
+            ]
+        return InlineKeyboardMarkup(keyboard)
 
     @staticmethod
-    def makeInlineQueryResultArticle_interactive(result: GameResult, resultId:int):
-        try:
-
-            if result.is_free:
-                price_text = "Price: FREE"
-            elif result.price is not None:
-                price_text =f"Price: {result.price}"
+    def makeCurrencyMessageFromCountry(countryMod: CountryModification):
+        if countryMod.configuredCountry or countryMod.requestedCountry:
+            if countryMod.configuredCountry:
+                text =f"Your currency has been set to {countryMod.configuredCountry}✅"
+                kb = InlineKeyboardMarkup([])
             else:
-                #possibly to be announced or just not sellable
-                price_text = ""
-
-            if result.discount:
-                price_text += f"\t[{result.discount}]"
-
-            message_text = (
-                f"[{result.title}]({result.link})\n"
-                + price_text + '\n'
-            )
-
-            if result.protonDBReport is not None:
-                tier = result.protonDBReport.tier
-                is_positive_trend = result.protonDBReport.trendingTier > result.protonDBReport.tier
-                trend_text = f"{tier.label()}📈" if is_positive_trend else f"{tier.label()}📉"
-
-                message_text += (
-                    f"\nProtonDB Tier: *{tier.label()}*"
-                    f"{tier.to_emoji()}"
-                    f"\nTrending: {trend_text}"
+                text =(
+                    f"Could not set currency to *{countryMod.requestedCountry}*. Is it a valid country code?"                
+                    "\nPerhaps you meant one of those:"
                 )
-
-            keyboardMarkup = TelegramInlineQueryMaker._makeKeyboardMarkup(
-                appid=result.appid,
-                steamlink=result.link,
-                resultId=resultId,
-                hasProtonDB=result.protonDBReport is not None
+                kb = TelegramInlineQueryMaker._makeCountryKeyboard(countryMod.alternativeSuggestions)
+        else:
+            text = (
+                "**How to set your currency:**\n"
+                "Use `/setcurrency CODE` (e.g., `/setcurrency US`).\n\n"
+                "Select one of the popular options below:"
             )
-                        
-            #this must be refactored asap.
-            # at this point it's soldered rather than coupled
-            return InlineQueryResultArticle(
-                id=str(uuid4()),
-                title=result.title,
-                description=price_text,
-                thumbnail_url=(
-                    f"https://cdn.akamai.steamstatic.com/steam/apps/"
-                    f"{result.appid}/capsule_sm_120.jpg?t"
-                ),
-                input_message_content=InputTextMessageContent(
-                    parse_mode="Markdown",
-                    message_text=message_text,
-                ),
-                reply_markup=keyboardMarkup
-            ),message_text, keyboardMarkup
+            kb = TelegramInlineQueryMaker._makeCountryKeyboard(countryMod.alternativeSuggestions)
+            
+        return TelegramCountryPresentation(text=text, keyboard=kb, parse_mode="Markdown")
+    
 
-        except Exception as e:
-            raise Exception(
-                f"Error in makeInlineQueryResultArticle: {e} "
-                f"(type: {type(e).__name__})"
-            )
-    @staticmethod
-    def makeProtonDBResultText(result: GameResult, resultId:int):
-        try:
-            message_text = ""
-            if result.protonDBReport is not None:
-                tier = result.protonDBReport.tier
-                is_positive_trend = result.protonDBReport.trendingTier > result.protonDBReport.tier
-                trend_text = f"{tier.label()}📈" if is_positive_trend else f"{tier.label()}📉"
-                message_text += (
-                    f"\n[ProtonDB](https://www.protondb.com/app/{result.appid}) Tier: *{tier.label()}*"
-                    f"{tier.to_emoji()}\t({result.protonDBReport.total} reports)"
-                    f"\nTrending: {trend_text}"
-                )
-
-                keyboardMarkup = TelegramInlineQueryMaker._makeKeyboardMarkup(
-                    appid=result.appid,
-                    steamlink=result.link,
-                    resultId=resultId,
-                    hasProtonDB=True,
-                    replace_back="PROTONDB"
-                )
-                return message_text,keyboardMarkup
-            else:
-                return f"[ProtonDB](https://www.protondb.com/app/{result.appid}) info couldnt be fetched", InlineKeyboardMarkup([])
-        except Exception as e:
-            raise Exception(
-                f"Error in makeProtonDBResultText: {e} "
-                f"(type: {type(e).__name__})"
-            )
     @staticmethod
     def _makeKeyboardMarkup(appid, steamlink, resultId:int, hasProtonDB:bool, replace_back=None):
         row1conts = {
@@ -153,13 +172,11 @@ class TelegramInlineQueryMaker:
         if replaceable != row1conts and  not hasProtonDB:
             row1conts.pop("PROTONDB")
         
-        return InlineKeyboardMarkup([list(row1conts.values()), list(row2conts.values())])
+        return InlineKeyboardMarkup(
+            [list(row1conts.values()),list(row2conts.values())])
         
-        
-                
-
-    
-CHANGE_CURRENCY_BUTTON = InlineQueryResultsButton(text="Change currency / hide this", start_parameter="changecurrency")
+CHANGE_CURRENCY_BUTTON = InlineQueryResultsButton(
+    text="Change currency / hide this", start_parameter="changecurrency")
 
 ERROR_RESULT = InlineQueryResultArticle(
     id=str(uuid4()),
