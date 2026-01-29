@@ -6,7 +6,7 @@ from modules.GameResult import GameResult
 import asyncio
 from modules.view.TelegramQueryMaker import (
     CHANGE_CURRENCY_BUTTON,
-    TelegramInlineQueryMaker,
+    TelegramPresenter,
     ERROR_RESULT,
     TOO_SHORT_RESULT,
     NO_MATCHES_RESULT,
@@ -26,7 +26,7 @@ from modules.db.GameResultRepository import GameResultRepository
 
 class Bot:
     def __init__(self, db:Connection):
-        self.queryMaker = TelegramInlineQueryMaker(SteamSearcher(MAX_RESULTS=6))
+        self.queryMaker = TelegramPresenter(SteamSearcher(MAX_RESULTS=6))
         self.db = db
         self.userRepo = UserRepository(db)
         self.gameResultRepo = GameResultRepository(db)
@@ -221,7 +221,7 @@ class Bot:
             gameResult = self.gameResultRepo.get_game_result(resultId)
             assert gameResult
             protondb = gameResult.protonDBReport
-            text,keyboardMarkup = TelegramInlineQueryMaker.makeProtonDBResultText(gameResult, resultId)
+            text,keyboardMarkup = TelegramPresenter.makeProtonDBResultText(gameResult, resultId)
             # await asyncio.gather(
             #     query.edit_message_text(text),
             #     query.edit_message_reply_markup(keyboardMarkup)
@@ -237,7 +237,7 @@ class Bot:
         resultId = int(query.data.split(' ')[1])
         gameResult = self.gameResultRepo.get_game_result(resultId)
         assert gameResult
-        article,text,keyboardMarkup = TelegramInlineQueryMaker.makeInlineQueryResultArticle_interactive(
+        article,text,keyboardMarkup = TelegramPresenter.makeInlineQueryResultArticle_interactive(
             gameResult, resultId
         )
         #todo: refactor asap

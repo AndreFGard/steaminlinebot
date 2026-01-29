@@ -30,11 +30,11 @@ class TelegramPresentation:
             raise ValueError("parse_mode must be either 'HTML' or 'Markdown'")
 
 @dataclass
-class TelegramArticleInlineArticlePresentation(TelegramPresentation):
+class TelegramInlineArticlePres(TelegramPresentation):
     queryArticle: InlineQueryResultArticle
 
 @dataclass
-class TelegramCountryPresentation(TelegramPresentation):
+class TelegramCountryPres(TelegramPresentation):
     ...
 
 @dataclass
@@ -48,7 +48,7 @@ class TelegramCallbackBuilder:
     def setcurrency(countrycode):
         return f"setcurrency {countrycode}"
 
-class TelegramInlineQueryMaker:
+class TelegramPresenter:
     @staticmethod
     def _presentProtonDBVM(protondb: ProtonDBVM|None):
         if not protondb: return ''
@@ -70,25 +70,25 @@ class TelegramInlineQueryMaker:
         return price
     @staticmethod
     def _presentGameResultVM(game: GameResultVM):
-        price = TelegramInlineQueryMaker._gamePriceLine(game)
+        price = TelegramPresenter._gamePriceLine(game)
         discount = f"\t[{game.discount}]" if game.discount is not None else ''
 
         return (
             f"[{game.title}]({game.link})" + '\n' +
             price + discount + '\n' +
-            TelegramInlineQueryMaker._presentProtonDBVM(game.protonDB)
+            TelegramPresenter._presentProtonDBVM(game.protonDB)
         )
 
     @staticmethod
     def _makeInlineGameArticle(game: GameResultVM, countryConfig:CountryConfig):
-        keyboardMarkup = TelegramInlineQueryMaker._makeKeyboardMarkup(
+        keyboardMarkup = TelegramPresenter._makeKeyboardMarkup(
             appid=game.appid,
             steamlink=game.link,
             resultId=game.id,
             hasProtonDB=game.protonDB is not None
         )
         
-        message_text = TelegramInlineQueryMaker._presentGameResultVM(game)
+        message_text = TelegramPresenter._presentGameResultVM(game)
 
 
         #this must be refactored asap.
@@ -96,7 +96,7 @@ class TelegramInlineQueryMaker:
         queryResult= InlineQueryResultArticle(
             id=str(uuid4()),
             title=game.title,
-            description=TelegramInlineQueryMaker._gamePriceLine(game),
+            description=TelegramPresenter._gamePriceLine(game),
             thumbnail_url=(
                 f"https://cdn.akamai.steamstatic.com/steam/apps/"
                 f"{game.appid}/capsule_sm_120.jpg?t"
@@ -108,7 +108,7 @@ class TelegramInlineQueryMaker:
             reply_markup=keyboardMarkup
         )
 
-        return TelegramArticleInlineArticlePresentation(
+        return TelegramInlineArticlePres(
             queryArticle = queryResult,
             text=message_text,
             keyboard=keyboardMarkup,
@@ -128,13 +128,13 @@ class TelegramInlineQueryMaker:
     @staticmethod
     def _makeInlineQueryResultsList(games:SearchResults, countryConfig:CountryConfig):
         articles = [
-            TelegramInlineQueryMaker._makeInlineGameArticle(
+            TelegramPresenter._makeInlineGameArticle(
                 game,
                 countryConfig
             ).queryArticle
             for game in games.results]
         articles.extend(
-            TelegramInlineQueryMaker._makeSpecialInlineQueryResult(r)
+            TelegramPresenter._makeSpecialInlineQueryResult(r)
             for r in games.specialResults
         )
         button = None if not games.configureCountry else CHANGE_CURRENCY_BUTTON
@@ -168,16 +168,16 @@ class TelegramInlineQueryMaker:
                     f"Could not set currency to *{countryMod.requestedCountry}*. Is it a valid country code?"                
                     "\nPerhaps you meant one of those:"
                 )
-                kb = TelegramInlineQueryMaker._makeCountryKeyboard(countryMod.alternativeSuggestions)
+                kb = TelegramPresenter._makeCountryKeyboard(countryMod.alternativeSuggestions)
         else:
             text = (
                 "**How to set your currency:**\n"
                 "Use `/setcurrency CODE` (e.g., `/setcurrency US`).\n\n"
                 "Select one of the popular options below:"
             )
-            kb = TelegramInlineQueryMaker._makeCountryKeyboard(countryMod.alternativeSuggestions)
+            kb = TelegramPresenter._makeCountryKeyboard(countryMod.alternativeSuggestions)
             
-        return TelegramCountryPresentation(text=text, keyboard=kb, parse_mode="Markdown")
+        return TelegramCountryPres(text=text, keyboard=kb, parse_mode="Markdown")
     
 
     @staticmethod
