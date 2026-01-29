@@ -65,6 +65,32 @@ class UserCountry:
             configuredCountry=country,
             requestedCountry=requestedCountry,
             alternativeSuggestions=list(reversed(list(codes))))
+
+    def deleteUser(self, userId: int) -> bool:
+        """Delete user data. Returns True if successful."""
+        try:
+            self._userRepo.delete_user(userId)
+            return True
+        except Exception as e:
+            logging.error(f"deleteUser error: {e}")
+            return False
+
+    async def parseSetCurrencyCommand(self, args: list[str]|None, userId: int, userLang: str) -> CountryModification:
+        if args:
+            requested_country = args[0]
+            return await self.setCountry(userId, requested_country, userLang)
+        
+        # No args - provide suggestions
+        local_suggestion = self._userRepo.get_country_by_language(userLang)
+        target_codes = ["BR", "US", "MX", "PL"]
+        if local_suggestion and local_suggestion not in target_codes:
+            target_codes.insert(0, local_suggestion)
+        
+        return CountryModification(
+            configuredCountry=None,
+            requestedCountry="",
+            alternativeSuggestions=target_codes
+        )
     
 
 

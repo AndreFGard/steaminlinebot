@@ -19,12 +19,7 @@ import dotenv
 
 from modules.db import init_db
 from modules.GameResult import GameResult
-from modules.view.TelegramQueryMaker import (
-    TelegramPresenter,
-    ERROR_RESULT,
-    TOO_SHORT_RESULT,
-    NO_MATCHES_RESULT,
-)
+
 from modules.SteamSearcher import SteamSearcher
 from modules.Bot import Bot
 

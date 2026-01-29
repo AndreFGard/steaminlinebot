@@ -84,7 +84,6 @@ class TelegramPresenter:
         keyboardMarkup = TelegramPresenter._makeKeyboardMarkup(
             appid=game.appid,
             steamlink=game.link,
-            resultId=game.id,
             hasProtonDB=game.protonDB is not None
         )
         
@@ -144,9 +143,23 @@ class TelegramPresenter:
 
         )
 
+    @staticmethod
+    def makeInlineQueryPresentation(searchResults: SearchResults, countryConfig: CountryConfig) -> TelegramInlineResultListPres:
+        return TelegramPresenter._makeInlineQueryResultsList(searchResults, countryConfig)
 
+    @staticmethod
+    def makeDeleteConfirmation(success: bool) -> TelegramPresentation:
+        if success:
+            text = "Your data has been deleted 🫡"
+        else:
+            text = "Failed to delete your data. Please report with /report"
         
-
+        return TelegramPresentation(
+            text=text,
+            keyboard=InlineKeyboardMarkup([]),
+            parse_mode="Markdown"
+        )
+        
     @staticmethod
     def _makeCountryKeyboard(codes:list[str]):
         keyboard = []
@@ -155,6 +168,7 @@ class TelegramPresenter:
                 InlineKeyboardButton(code, callback_data=TelegramCallbackBuilder.setcurrency(code))
                 for code in codes[i:i+3]
             ]
+            keyboard.append(row)
         return InlineKeyboardMarkup(keyboard)
 
     @staticmethod
@@ -181,33 +195,27 @@ class TelegramPresenter:
     
 
     @staticmethod
-    def _makeKeyboardMarkup(appid, steamlink, resultId:int, hasProtonDB:bool, replace_back=None):
-        row1conts = {
-            "STEAM": InlineKeyboardButton("Steam Page", url=steamlink),
-            "PROTONDB": InlineKeyboardButton(
-                "ProtonDB 🐧",
-                #url=f"https://www.protondb.com/app/{result.appid}",
-                callback_data=f"protondb_cb {resultId}" #will call _handle_game_result_callback
+    def _makeKeyboardMarkup(appid, steamlink, hasProtonDB:bool):
+        row1buttons = [
+            InlineKeyboardButton("Steam Page", url=steamlink)
+        ]
+        
+        if hasProtonDB:
+            row1buttons.append(
+                InlineKeyboardButton(
+                    "ProtonDB 🐧",
+                    url=f"https://www.protondb.com/app/{appid}"
                 )
-        }
-        row2conts = {"PRICEHISTORY": InlineKeyboardButton(
-            "Price History",url=(f"https://steamdb.info/app/{appid}/#pricehistory"))}
-        backButton = InlineKeyboardButton("Overview", callback_data=f"overview_cb {resultId}")
+            )
         
-        replaceable: None|dict = None
-        if replace_back in row1conts:
-            replaceable = row1conts
-        elif replace_back in row2conts:
-            replaceable = row2conts
+        row2buttons = [
+            InlineKeyboardButton(
+                "Price History",
+                url=f"https://steamdb.info/app/{appid}/#pricehistory"
+            )
+        ]
         
-        if replaceable is not None:
-            replaceable[replace_back] = backButton
-        
-        if replaceable != row1conts and  not hasProtonDB:
-            row1conts.pop("PROTONDB")
-        
-        return InlineKeyboardMarkup(
-            [list(row1conts.values()),list(row2conts.values())])
+        return InlineKeyboardMarkup([row1buttons, row2buttons])
         
 CHANGE_CURRENCY_BUTTON = InlineQueryResultsButton(
     text="Change currency / hide this", start_parameter="/setcurrency")
