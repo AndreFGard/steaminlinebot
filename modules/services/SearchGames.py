@@ -4,7 +4,7 @@ from sqlite3 import Connection
 from dataclasses import dataclass
 import time
 
-from modules.SteamSearcher import SteamSearcher
+from modules.services.SteamClient import SteamClient
 from modules.db.UserRepository import UserRepository
 from modules.db.GameResultRepository import GameResultRepository
 from typing import Optional
@@ -50,7 +50,7 @@ class SearchGames:
         self._db = db
         self._userRepo = UserRepository(db)
         self._gameResultRepo = GameResultRepository(db)
-        self._searcher = SteamSearcher(MAX_RESULTS=6)
+        self._searcher = SteamClient(MAX_RESULTS=6)
         self._userCountry = UserCountry(db)
     async def searchGame(self, userId, query, fallback_languages=[]):
         errors = set()

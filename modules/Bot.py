@@ -5,7 +5,6 @@ from typing import Callable,Any, Coroutine, Mapping
 from modules.GameResult import GameResult
 import asyncio
 from modules.presentation.TelegramPresenter import TelegramPresenter
-from modules.SteamSearcher import SteamSearcher
 from modules.services.SearchGames import SearchGames
 from modules.services.UserCountry import UserCountry
 

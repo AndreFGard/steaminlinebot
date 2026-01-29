@@ -20,7 +20,6 @@ import dotenv
 from modules.db import init_db
 from modules.GameResult import GameResult
 
-from modules.SteamSearcher import SteamSearcher
 from modules.Bot import Bot
 
 

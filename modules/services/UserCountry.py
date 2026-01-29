@@ -6,7 +6,6 @@ import time
 
 from telegram import Update
 
-from modules.SteamSearcher import SteamSearcher
 from modules.db.UserRepository import UserRepository
 from modules.db.GameResultRepository import GameResultRepository
 from typing import Optional

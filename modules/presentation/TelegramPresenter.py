@@ -10,7 +10,6 @@ from telegram import (
     InlineKeyboardButton,
 )
 from modules import ProtonDBReport
-from modules.InlineQueryMaker import InlineQueryMaker
 from uuid import uuid4
 from modules.GameResult import GameResult
 from dataclasses import dataclass

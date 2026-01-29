@@ -65,7 +65,7 @@ class ScrapeResult:
     results: list[GameResult]
 
 
-class SteamSearcher:
+class SteamClient:
     def __init__(self, MAX_RESULTS):
         self.MAX_RESULTS = MAX_RESULTS
         self.API_GAME_SEARCH = "https://store.steampowered.com/search/suggest"
@@ -149,5 +149,5 @@ class SteamSearcher:
 
 
 # debug
-# searcher = SteamSearcher(6, {})
+# searcher = SteamClient(6, {})
 # results = searcher.getGameResultsSync("tarkov")
