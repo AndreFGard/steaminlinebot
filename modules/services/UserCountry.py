@@ -9,7 +9,6 @@ from telegram import Update
 from modules.db.UserRepository import UserRepository
 from modules.db.GameResultRepository import GameResultRepository
 from typing import Optional
-from pydantic import BaseModel
 from modules.ProtonDBReport import ProtonDBReport, ProtonDBTier
 
 
