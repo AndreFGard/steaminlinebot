@@ -16,6 +16,7 @@ class ProtonDBVM:
     tier: ProtonDBTier
     positive_trend: bool
     totalReports: int
+    appid: str
 
 @dataclass
 class GameResultVM:
@@ -34,7 +35,6 @@ from enum import Enum
 class SpecialResults(Enum):
     NO_MATCHES = 1
     ERROR = 2
-    CONFIGURE_COUNTRY =3
     QUERY_TOO_SHORT = 4
 
 @dataclass
@@ -42,6 +42,8 @@ class SearchResults:
     results: list[GameResultVM]
     specialResults: list[SpecialResults]
     scrapeTime: float
+    configureCountry: bool
+
 
 class SearchGames:
     def __init__(self, db:Connection):
@@ -56,10 +58,12 @@ class SearchGames:
 
         if len(query) < 3:
             errors.add(SpecialResults.QUERY_TOO_SHORT)
-            return SearchResults(results, list(errors), 0.0)
+            return SearchResults(results, list(errors), 0.0, False)
         
         if not fallback_languages: fallback_languages.append("US")
-        country_configured,country = self._userCountry.get_country(userId,fallback_languages)
+        cfg = self._userCountry.get_country(userId,fallback_languages)
+        country = cfg.country
+        country_configured = cfg.hasConfigured
 
         start = time.time()
         res = await self._searcher.scrapeGameResults(query, country)
@@ -69,18 +73,18 @@ class SearchGames:
             errors.add(SpecialResults.ERROR)
         if not res.results:
             errors.add(SpecialResults.NO_MATCHES)
-        if not country_configured:
-            errors.add(SpecialResults.CONFIGURE_COUNTRY)
         
-
         for r in res.results:
             try:
                 rId = self._gameResultRepo.insert_game_result(r)
+
                 protonDBVm = (ProtonDBVM(
-                    tier=r.protonDBReport.tier,
+                    tier= r.protonDBReport.tier,
                     positive_trend=r.protonDBReport.trendingTier > r.protonDBReport.tier,
-                    totalReports=r.protonDBReport.total)
+                    totalReports=r.protonDBReport.total,
+                    appid=r.appid)
                         if r.protonDBReport else None)
+
                 results.append(GameResultVM(
                     id=rId,
                     link=r.link,
@@ -95,4 +99,4 @@ class SearchGames:
                 logging.info(f"Error at searchGame when building Result: {e}")
                 errors.add(SpecialResults.ERROR)
 
-        return SearchResults(results, list(errors), end-start)
+        return SearchResults(results, list(errors), end-start, not country_configured)

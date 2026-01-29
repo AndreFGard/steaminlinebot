@@ -15,11 +15,16 @@ from modules.ProtonDBReport import ProtonDBReport, ProtonDBTier
 
 
 @dataclass
-class CountryConfig:
+class CountryModification:
     configuredCountry: Optional[str]
+    requestedCountry: str
     """Might be None if unsuccessful"""
     alternativeSuggestions: list[str]
 
+@dataclass
+class CountryConfig:
+    country: str
+    hasConfigured:bool
 
 class UserCountry:
     def __init__(self, db:Connection):
@@ -35,24 +40,31 @@ class UserCountry:
                 if country: break
 
         if not country: country = "US"
-        return (has_set,country )
+        return CountryConfig(country=country, hasConfigured=has_set)
 
     async def setCountry(self, userId: int, country:str, userLang:str):
+        requestedCountry = country
         country = country.upper()
         try:
             success = self._userRepo.upsert_user_country(userId, country)
         except Exception as e :
             success = False
-            logging.error(f"setCountry errro: {e}")
+            logging.error(f"setCountry error: {e}")
         if success:
-            return CountryConfig(country, [])
+            return CountryModification(
+                configuredCountry=country,
+                requestedCountry=requestedCountry,
+                alternativeSuggestions=[])
         
         #language based suggestion
         suggestion = self._userRepo.get_country_by_language(userLang)
         codes = {"PT", "PL", "BR", "US"}
         if suggestion: codes.add(suggestion)
 
-        return CountryConfig(None, list(reversed(list(codes))))
-        
+        return CountryModification(
+            configuredCountry=country,
+            requestedCountry=requestedCountry,
+            alternativeSuggestions=list(reversed(list(codes))))
+    
 
 

@@ -31,11 +31,16 @@ class TelegramPresentation:
 
 @dataclass
 class TelegramArticleInlineArticlePresentation(TelegramPresentation):
-    queryArticle: Optional[InlineQueryResultArticle]
+    queryArticle: InlineQueryResultArticle
 
 @dataclass
 class TelegramCountryPresentation(TelegramPresentation):
     ...
+
+@dataclass
+class TelegramInlineResultListPres:
+    results: list[InlineQueryResultArticle]
+    button: Optional[InlineQueryResultsButton]
 
 
 class TelegramCallbackBuilder:
@@ -111,7 +116,36 @@ class TelegramInlineQueryMaker:
         )
     
     @staticmethod
-    def _makeInlineQueryResultList(games:SearchResults):
+    def _makeSpecialInlineQueryResult(result: SpecialResults)->InlineQueryResultArticle:
+        match result:
+            case SpecialResults.ERROR:
+                return ERROR_RESULT
+            case SpecialResults.QUERY_TOO_SHORT:
+                return TOO_SHORT_RESULT
+            case SpecialResults.NO_MATCHES:
+                return NO_MATCHES_RESULT
+
+    @staticmethod
+    def _makeInlineQueryResultsList(games:SearchResults, countryConfig:CountryConfig):
+        articles = [
+            TelegramInlineQueryMaker._makeInlineGameArticle(
+                game,
+                countryConfig
+            ).queryArticle
+            for game in games.results]
+        articles.extend(
+            TelegramInlineQueryMaker._makeSpecialInlineQueryResult(r)
+            for r in games.specialResults
+        )
+        button = None if not games.configureCountry else CHANGE_CURRENCY_BUTTON
+        return TelegramInlineResultListPres(
+            button=button,
+            results=articles,
+
+        )
+
+
+        
 
     @staticmethod
     def _makeCountryKeyboard(codes:list[str]):
@@ -176,7 +210,7 @@ class TelegramInlineQueryMaker:
             [list(row1conts.values()),list(row2conts.values())])
         
 CHANGE_CURRENCY_BUTTON = InlineQueryResultsButton(
-    text="Change currency / hide this", start_parameter="changecurrency")
+    text="Change currency / hide this", start_parameter="/setcurrency")
 
 ERROR_RESULT = InlineQueryResultArticle(
     id=str(uuid4()),
