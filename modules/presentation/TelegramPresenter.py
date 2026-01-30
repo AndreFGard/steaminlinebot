@@ -9,7 +9,6 @@ from telegram import (
     InputTextMessageContent,
     InlineKeyboardButton,
 )
-from modules import ProtonDBReport
 from uuid import uuid4
 from modules.GameResult import GameResult
 from dataclasses import dataclass

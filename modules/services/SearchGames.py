@@ -8,7 +8,7 @@ from modules.services.SteamClient import SteamClient
 from modules.db.UserRepository import UserRepository
 from modules.db.GameResultRepository import GameResultRepository
 from typing import Optional
-from modules.ProtonDBReport import ProtonDBReport, ProtonDBTier
+from modules.services.ProtonDBClient import ProtonDBReport, ProtonDBTier
 from modules.services.UserCountry import UserCountry
 @dataclass
 class ProtonDBVM:

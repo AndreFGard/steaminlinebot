@@ -1,7 +1,7 @@
 from typing import Optional
 import logging
 
-from modules.ProtonDBReport import ProtonDBReport
+from modules.services.ProtonDBClient import ProtonDBReport
 from dataclasses import dataclass, field
 
 @dataclass
