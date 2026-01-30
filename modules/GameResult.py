@@ -34,7 +34,7 @@ class GameResult:
         return None
 
     @staticmethod
-    def makeGameResultFromSteamApiGameDetails(gamedetails:dict, protonDBReport:Optional[ProtonDBReport] = None, country:Optional[str]=None):
+    def makeGameResultFromSteamApiGameDetails(gamedetails:dict, desiredType:str, protonDBReport:Optional[ProtonDBReport] = None, country:Optional[str]=None):
         try:
             appid: str = tuple(gamedetails.keys())[0]
 
@@ -44,6 +44,9 @@ class GameResult:
             link = f"https://store.steampowered.com/app/{appid}/"
             data = gamedetails[appid]['data']
             title = data['name']
+            productType = data['type']
+            if productType != desiredType:
+                raise Exception(f"Undesired Game type {productType}")
             
             has_price = False
             is_free = False

@@ -142,7 +142,7 @@ class SteamClient:
 
             raw_results = [
                 GameResult.makeGameResultFromSteamApiGameDetails(
-                    gameDetail, protonDBReport=protondb,country=country
+                    gameDetail, desiredType="game", protonDBReport=protondb,country=country
                 )
                 for gameDetail, protondb in zip(gamedetails, protondbs)
             ]
