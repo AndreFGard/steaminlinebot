@@ -1,7 +1,7 @@
 from typing import Iterable, Optional, Union
 from attr import dataclass
 from gazpacho.soup import Soup
-from modules.ProtonDBClient import ProtonDBClient
+from modules.services.ProtonDBClient import ProtonDBClient
 from bs4 import BeautifulSoup
 import aiohttp
 import asyncio
@@ -13,7 +13,7 @@ from modules.async_lru_cache_ttl import async_lru_cache_ttl
 from urllib.parse import urlencode
 import logging
 
-API_APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails?filters=basic,price_overview"
+API_APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails"
 
 
 # WIP that uses the search endpoint rather than the appdetails one
@@ -82,7 +82,7 @@ class SteamClient:
                     "realm": 1,
                     "l": "english",
                 }
-                
+                #https://store.steampowered.com/search/suggest?term=counter+strike&f=games&cc=US&realm=1&l=english
                 logging.info(f"Searching games URL: {self.API_GAME_SEARCH}?{urlencode(params)}")
 
                 req = session.get(self.API_GAME_SEARCH, params=params)
@@ -106,9 +106,13 @@ class SteamClient:
 
     async def _getGameDetailsFromAppid(self, appid, country, session) -> dict:
         """makes steam api details request for given appid and returns future for it's json response"""
-        params = {'appids':appid, "cc": country}
+        params = {
+            'appids':appid,
+            "cc": country,
+            "filters": "basic,price_overview",
+        }
         logging.info(f"Getting gamedetails json: {self.API_APP_DETAILS_URL}?{urlencode(params)}")
-
+        #https://store.steampowered.com/api/appdetails?appids=730&cc=US&filters=basic,Cprice_overview
         async with session.get(self.API_APP_DETAILS_URL, params=params) as r:
             return await r.json()
 
