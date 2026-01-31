@@ -4,6 +4,7 @@ from sqlite3 import Connection
 from dataclasses import dataclass
 import time
 
+from modules.GameResult import GameResult
 from modules.services.SteamClient import SteamClient
 from modules.db.UserRepository import UserRepository
 from modules.db.GameResultRepository import GameResultRepository
@@ -26,7 +27,7 @@ class GameResultVM:
     appid: str
     price: Optional[str]
     is_free: bool
-    discount: Optional[str]
+    discount: Optional[int]
     protonDB: Optional[ProtonDBVM]
 
 from enum import Enum
@@ -53,7 +54,7 @@ class SearchGames:
         self._userCountry = UserCountry(db)
     async def searchGame(self, userId, query, fallback_languages=[]):
         errors = set()
-        results = []
+        results:list[GameResultVM] = []
 
         if len(query) < 3:
             errors.add(SpecialResults.QUERY_TOO_SHORT)
@@ -89,7 +90,7 @@ class SearchGames:
                     link=r.link,
                     title=r.title,
                     appid=r.appid,
-                    price=r.price,
+                    price=r.price.present() if r.price else None,
                     is_free=r.is_free,
                     discount=r.discount,
                     protonDB=protonDBVm

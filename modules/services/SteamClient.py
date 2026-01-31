@@ -7,7 +7,8 @@ import aiohttp
 import asyncio
 from urllib.parse import quote_plus
 import time
-
+from decimal import Decimal
+from modules.services.Money import Money
 from modules.GameResult import GameResult
 from modules.async_lru_cache_ttl import async_lru_cache_ttl
 from urllib.parse import urlencode
@@ -103,26 +104,40 @@ class SteamClient:
             productType = data['type']
             if productType != desiredType:
                 raise Exception(f"Undesired Game type {productType}")
-            
+
             has_price = False
             is_free = False
             discount = None
 
             if data['is_free']:
                 is_free = True
-                price = None
+                money = None
             elif 'price_overview' not in data:
-                price = None
+                money = None
                 discount = None
             else:
-                #This is a WIP, as the value position changes based on locales/countries
-                price = str(data['price_overview']['final_formatted'])
-                discount = SteamClient._parseDiscount(price, data["price_overview"]["discount_percent"])
+                # This is a WIP, as the value position changes based on locales/countries
+                currency = data['price_overview']['currency']
+                discount = data['price_overview']['discount_percent']
+                money = Money(
+                    country=country if country else "",
+                    currency3l=currency,
+                    value_minor=int(data['price_overview']['final'])
+                )
 
-            return(GameResult(link=link, title=title, appid=appid, price=price, discount=discount, protonDBReport=protonDBReport, is_free=is_free, country=country))
+            return GameResult(
+                link=link,
+                title=title,
+                appid=appid,
+                price=money,
+                discount=discount,
+                protonDBReport=protonDBReport,
+                is_free=is_free,
+                country=country,
+            )
 
         except Exception as e:
-            logging.warning(f"Error in makeGameResultFromSteamApiGameDetails: {e}")
+            logging.warning(f"Error in _makeGameResult: {e}")
             return None
 
     async def _getGameSugestions(self, gamenames: Iterable[str], country):
@@ -136,7 +151,7 @@ class SteamClient:
                     "realm": 1,
                     "l": "english",
                 }
-                #https://store.steampowered.com/search/suggest?term=counter+strike&f=games&cc=US&realm=1&l=english
+                # https://store.steampowered.com/search/suggest?term=counter+strike&f=games&cc=US&realm=1&l=english
                 logging.info(f"Searching games URL: {self.API_GAME_SEARCH}?{urlencode(params)}")
 
                 req = session.get(self.API_GAME_SEARCH, params=params)
@@ -166,11 +181,11 @@ class SteamClient:
             "filters": "basic,price_overview",
         }
         logging.info(f"Getting gamedetails json: {self.API_APP_DETAILS_URL}?{urlencode(params)}")
-        #https://store.steampowered.com/api/appdetails?appids=730&cc=US&filters=basic,price_overview
+        # https://store.steampowered.com/api/appdetails?appids=730&cc=US&filters=basic,price_overview
         async with session.get(self.API_APP_DETAILS_URL, params=params) as r:
             return await r.json()
 
-    #we need this only to get discount data, as _getGame_sugestions doesnt have it
+    # we need this only to get discount data, as _getGame_sugestions doesnt have it
     async def _getAllGameDetails(self, appids, country, session):
         """gets game details for each given appid and returns list with every response's json"""
         tasks = [

@@ -2,7 +2,7 @@ from typing import Optional
 import logging
 
 from pydantic import BaseModel
-
+from modules.services.Money import Money
 from modules.services.ProtonDBClient import ProtonDBReport
 from dataclasses import dataclass, field
 
@@ -10,10 +10,10 @@ class GameResult(BaseModel):
     link: str
     title: str
     appid: str
-    price: Optional[str]
+    price:Optional[Money]
     is_free: bool
     country: Optional[str]
-    discount: Optional[str]
+    discount: Optional[int]
     protonDBReport: Optional[ProtonDBReport] = None
     
     def __repr__(self):
