@@ -69,7 +69,7 @@ class TelegramPresenter:
     @staticmethod
     def _presentGameResultVM(game: GameResultVM):
         price = TelegramPresenter._gamePriceLine(game)
-        discount = f"\t[{game.discount}]" if game.discount is not None else ''
+        discount = f"\t\\[-{game.discount}%]" if game.discount is not None else ''
 
         return (
             f"[{game.title}]({game.link})" + '\n' +
