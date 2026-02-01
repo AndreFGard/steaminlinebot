@@ -72,13 +72,15 @@ class UserCountry:
             logging.error(f"deleteUser error: {e}")
             return False
 
-    async def parseSetCurrencyCommand(self, args: list[str]|None, userId: int, userLang: str) -> CountryModification:
+    async def parseSetCurrencyCommand(self, args: list[str]|None, userId: int, langETF: str) -> CountryModification:
+        lang = langETF.split('-')[0].lower()
+
         if args:
             requested_country = args[0]
-            return await self.setCountry(userId, requested_country, userLang)
+            return await self.setCountry(userId, requested_country, lang)
         
         # No args - provide suggestions
-        local_suggestion = self._userRepo.get_country_by_language(userLang)
+        local_suggestion = self._userRepo.get_country_by_language(lang)
         target_codes = ["BR", "US", "MX", "PL"]
         if local_suggestion and local_suggestion not in target_codes:
             target_codes.insert(0, local_suggestion)
