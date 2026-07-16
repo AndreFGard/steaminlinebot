@@ -1,9 +1,34 @@
 import logging
 from dataclasses import dataclass
-from sqlite3 import Connection
+from abc import ABC, abstractmethod
 from typing import Optional
 
-from modules.db.UserRepository import UserRepository
+from modules.db.UserRepository import IUserRepository, UserRepository
+
+
+class IUserCountry(ABC):
+    """Resolves and persists user currency/country preferences."""
+
+    @abstractmethod
+    def get_country(
+        self,
+        user_id: int,
+        fallback_languages: list[str] | None = None,
+    ) -> CountryConfig:
+        ...
+
+    @abstractmethod
+    def delete_user(self, user_id: int) -> bool:
+        ...
+
+    @abstractmethod
+    async def parse_set_currency_command(
+        self,
+        args: list[str] | None,
+        user_id: int,
+        lang_etf: str,
+    ) -> CountryModification:
+        ...
 
 
 @dataclass
@@ -20,9 +45,9 @@ class CountryConfig:
     has_configured: bool
 
 
-class UserCountry:
-    def __init__(self, db: Connection):
-        self._user_repo = UserRepository(db)
+class UserCountry(IUserCountry):
+    def __init__(self, user_repo: IUserRepository):
+        self._user_repo = user_repo
 
     def get_country(self, user_id: int, fallback_languages=None):
         if fallback_languages is None:

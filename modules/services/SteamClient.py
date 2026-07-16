@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import time
+from abc import ABC, abstractmethod
 from typing import Iterable, Optional, Union
 from urllib.parse import quote_plus, urlencode
 
@@ -12,6 +13,7 @@ from gazpacho.soup import Soup
 from modules.GameResult import GameResult
 from modules.async_lru_cache_ttl import async_lru_cache_ttl
 from modules.services.Money import Money
+from modules.services.ProtonDBClient import IProtonDBClient
 from modules.services.ProtonDBClient import ProtonDBClient, ProtonDBReport
 
 API_APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails"
@@ -66,11 +68,24 @@ class ScrapeResult:
     results: list[GameResult]
 
 
-class SteamClient:
-    def __init__(self, max_results):
+class ISteamClient(ABC):
+    """Scrapes Steam search results and fetches game details."""
+
+    @abstractmethod
+    async def scrape_game_results(self, query: str, country: str) -> ScrapeResult:
+        ...
+
+
+class SteamClient(ISteamClient):
+    def __init__(
+        self,
+        max_results: int,
+        protondb_client: IProtonDBClient | None = None,
+    ):
         self.max_results = max_results
         self.api_game_search = "https://store.steampowered.com/search/suggest"
         self.api_app_details_url = API_APP_DETAILS_URL
+        self._protondb = protondb_client or ProtonDBClient()
 
     @staticmethod
     def _parse_discount(price_str, discount_value: int):
@@ -218,7 +233,7 @@ class SteamClient:
         async with aiohttp.ClientSession() as session:
             game_details, protondbs = await asyncio.gather(
                 self._get_all_game_details(appids, country, session),
-                ProtonDBClient.get_reports(appids),
+                self._protondb.get_reports(appids),
             )
             # hopefully, their order is the same
 

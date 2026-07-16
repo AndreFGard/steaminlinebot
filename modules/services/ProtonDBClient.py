@@ -4,11 +4,22 @@ import time
 from dataclasses import dataclass
 from enum import IntEnum
 from functools import wraps
+from abc import ABC, abstractmethod
 from typing import Any, Callable, Iterable, List, Tuple
 
 import aiohttp
 
 from modules.async_lru_cache_ttl import async_lru_cache_ttl
+
+
+class IProtonDBClient(ABC):
+    """Fetches ProtonDB compatibility reports for Steam app IDs."""
+
+    @abstractmethod
+    async def get_reports(
+        self, appids: Iterable[str]
+    ) -> list[None | ProtonDBReport]:
+        ...
 
 
 class ProtonDBTier(IntEnum):
@@ -52,7 +63,7 @@ class ProtonDBReport:
         return str(self.__dict__)
 
 
-class ProtonDBClient:
+class ProtonDBClient(IProtonDBClient):
     @staticmethod
     @async_lru_cache_ttl
     async def _get_report(appid: str):
@@ -71,8 +82,7 @@ class ProtonDBClient:
                     trending_tier=ProtonDBTier[data["trendingTier"].upper()],
                 )
 
-    @staticmethod
-    async def get_reports(appids: Iterable[str]) -> list[None | ProtonDBReport]:
+    async def get_reports(self, appids: Iterable[str]) -> list[None | ProtonDBReport]:
         results = await asyncio.gather(
             *(ProtonDBClient._get_report(appid) for appid in appids),
             return_exceptions=True,

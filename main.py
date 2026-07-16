@@ -8,17 +8,10 @@
 import logging
 import os
 import sys
-import time
-from functools import cache
 from logging import DEBUG, INFO, WARNING, basicConfig
 
-import sqlite3
 
 from telegram import (
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    InlineQueryResultArticle,
-    InputTextMessageContent,
     Update,
 )
 from telegram.ext import (
@@ -26,12 +19,16 @@ from telegram.ext import (
     CallbackQueryHandler,
     CommandHandler,
     InlineQueryHandler,
-    Updater,
 )
 
 from modules.Bot import Bot
-from modules.GameResult import GameResult
 from modules.db import init_db
+from modules.db.GameResultRepository import GameResultRepository
+from modules.db.UserRepository import UserRepository
+from modules.services.ProtonDBClient import ProtonDBClient
+from modules.services.SearchGames import SearchGames
+from modules.services.SteamClient import SteamClient
+from modules.services.UserCountry import UserCountry
 
 
 logLevel = {""}
@@ -74,7 +71,24 @@ def main():
         sys.exit(1)
 
     db = init_db.init_db("data/db.sqlite")
-    bot = Bot(db)
+
+    user_repo = UserRepository(db)
+    game_result_repo = GameResultRepository(db)
+    protondb_client = ProtonDBClient()
+    steam_client = SteamClient(max_results=6, protondb_client=protondb_client)
+    user_country = UserCountry(user_repo=user_repo)
+    search_games = SearchGames(
+        searcher=steam_client,
+        game_result_repo=game_result_repo,
+        user_repo=user_repo,
+        user_country=user_country,
+    )
+    bot = Bot(
+        user_repo=user_repo,
+        game_result_repo=game_result_repo,
+        search_games=search_games,
+        user_country=user_country,
+    )
 
     application = Application.builder().token(token).build()
 

@@ -1,6 +1,7 @@
 import logging
 import sqlite3
 import time
+from abc import ABC, abstractmethod
 from typing import Optional
 
 from modules.GameResult import GameResult
@@ -8,7 +9,19 @@ from modules.services import Money
 from modules.services.ProtonDBClient import ProtonDBReport, ProtonDBTier
 
 
-class GameResultRepository:
+class IGameResultRepository(ABC):
+    """Data access for cached game results and ProtonDB reports."""
+
+    @abstractmethod
+    def insert_game_result(self, game: GameResult) -> int:
+        ...
+
+    @abstractmethod
+    def get_game_result(self, gameresult_id: int) -> Optional[GameResult]:
+        ...
+
+
+class GameResultRepository(IGameResultRepository):
     def __init__(self, db: sqlite3.Connection):
         self.db = db
 

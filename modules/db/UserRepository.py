@@ -1,8 +1,29 @@
 import logging
 import sqlite3
+from abc import ABC, abstractmethod
 
 
-class UserRepository:
+class IUserRepository(ABC):
+    """Data access for Telegram users and country preferences."""
+
+    @abstractmethod
+    def delete_user(self, user_id: int) -> int:
+        ...
+
+    @abstractmethod
+    def get_country_by_language(self, language: str) -> str | None:
+        ...
+
+    @abstractmethod
+    def get_user_country(self, user_id: int) -> str | None:
+        ...
+
+    @abstractmethod
+    def upsert_user_country(self, user_id: int, country_code: str) -> bool:
+        ...
+
+
+class UserRepository(IUserRepository):
     def __init__(self, db: sqlite3.Connection):
         self.db = db
 

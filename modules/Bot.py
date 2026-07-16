@@ -1,27 +1,30 @@
 import asyncio
 import logging
 import time
-from sqlite3 import Connection
 from typing import Any, Callable, Coroutine, Mapping
 
 from telegram import Update
 from telegram.ext import InvalidCallbackData
 
-from modules.GameResult import GameResult
-from modules.db.GameResultRepository import GameResultRepository
-from modules.db.UserRepository import UserRepository
+from modules.db.GameResultRepository import IGameResultRepository
+from modules.db.UserRepository import IUserRepository
 from modules.presentation.TelegramPresenter import TelegramPresenter
-from modules.services.SearchGames import SearchGames
-from modules.services.UserCountry import UserCountry
+from modules.services.SearchGames import ISearchGames
+from modules.services.UserCountry import IUserCountry
 
 
 class Bot:
-    def __init__(self, db: Connection):
-        self.db = db
-        self.user_repo = UserRepository(db)
-        self.game_result_repo = GameResultRepository(db)
-        self.search_games = SearchGames(db)
-        self.user_country = UserCountry(db)
+    def __init__(
+        self,
+        user_repo: IUserRepository,
+        game_result_repo: IGameResultRepository,
+        search_games: ISearchGames,
+        user_country: IUserCountry,
+    ):
+        self.user_repo = user_repo
+        self.game_result_repo = game_result_repo
+        self.search_games = search_games
+        self.user_country = user_country
         self._callback_handlers: Mapping[
             str, Callable[[Update, Any], Coroutine[Any, Any, Any]]
         ] = self._init_callback_handlers()

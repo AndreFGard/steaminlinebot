@@ -2,15 +2,28 @@ import logging
 import time
 from dataclasses import dataclass
 from enum import Enum
-from sqlite3 import Connection
+from abc import ABC, abstractmethod
 from typing import Optional
 
 from modules.GameResult import GameResult
-from modules.db.GameResultRepository import GameResultRepository
-from modules.db.UserRepository import UserRepository
+from modules.db.GameResultRepository import IGameResultRepository
+from modules.db.UserRepository import IUserRepository
 from modules.services.ProtonDBClient import ProtonDBReport, ProtonDBTier
-from modules.services.SteamClient import SteamClient
-from modules.services.UserCountry import UserCountry
+from modules.services.SteamClient import ISteamClient
+from modules.services.UserCountry import IUserCountry
+
+
+class ISearchGames(ABC):
+    """Orchestrates game search: Steam scraping + ProtonDB + persistence."""
+
+    @abstractmethod
+    async def search_game(
+        self,
+        user_id: int,
+        query: str,
+        fallback_languages: list[str] | None = None,
+    ) -> SearchResults:
+        ...
 
 
 @dataclass
@@ -49,13 +62,18 @@ class SearchResults:
     configure_country: bool
 
 
-class SearchGames:
-    def __init__(self, db: Connection):
-        self._db = db
-        self._user_repo = UserRepository(db)
-        self._game_result_repo = GameResultRepository(db)
-        self._searcher = SteamClient(max_results=6)
-        self._user_country = UserCountry(db)
+class SearchGames(ISearchGames):
+    def __init__(
+        self,
+        searcher: ISteamClient,
+        game_result_repo: IGameResultRepository,
+        user_repo: IUserRepository,
+        user_country: IUserCountry,
+    ):
+        self._user_repo = user_repo
+        self._game_result_repo = game_result_repo
+        self._searcher = searcher
+        self._user_country = user_country
 
     async def search_game(self, user_id, query, fallback_languages=None):
         if fallback_languages is None:
