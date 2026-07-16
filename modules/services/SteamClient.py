@@ -77,9 +77,9 @@ class SteamClient:
     def _parseDiscount(priceStr, discountValue: int):
         """Parses discounts in different locales"""
         e = Exception()
-        for valueidx in [0,1]:
-            try: 
-                if float(priceStr.split()[valueidx].replace(",",".")) == 0.0:
+        for valueidx in [0, 1]:
+            try:
+                if float(priceStr.split()[valueidx].replace(",", ".")) == 0.0:
                     return None
                 else:
                     if float(discountValue) == 0.0:
@@ -88,21 +88,28 @@ class SteamClient:
                     return discount
             except Exception as ee:
                 e = ee
-        logging.warning(f"Price parsing of price/discount: ('{priceStr}','{discountValue}') error: {e}")
+        logging.warning(
+            f"Price parsing of price/discount: ('{priceStr}','{discountValue}') error: {e}"
+        )
         return None
 
     @staticmethod
-    def _makeGameResult(gamedetails:dict, desiredType:str, protonDBReport:Optional[ProtonDBReport] = None, country:Optional[str]=None):
+    def _makeGameResult(
+        gamedetails: dict,
+        desiredType: str,
+        protonDBReport: Optional[ProtonDBReport] = None,
+        country: Optional[str] = None,
+    ):
         try:
             appid: str = tuple(gamedetails.keys())[0]
 
-            if not gamedetails[appid]['success']:
+            if not gamedetails[appid]["success"]:
                 raise Exception(f"Unsuccessful gamedetails result: {gamedetails}")
 
             link = f"https://store.steampowered.com/app/{appid}/"
-            data = gamedetails[appid]['data']
-            title = data['name']
-            productType = data['type']
+            data = gamedetails[appid]["data"]
+            title = data["name"]
+            productType = data["type"]
             if productType != desiredType:
                 raise Exception(f"Undesired Game type {productType}")
 
@@ -110,20 +117,20 @@ class SteamClient:
             is_free = False
             discount = None
 
-            if data['is_free']:
+            if data["is_free"]:
                 is_free = True
                 money = None
-            elif 'price_overview' not in data:
+            elif "price_overview" not in data:
                 money = None
                 discount = None
             else:
                 # This is a WIP, as the value position changes based on locales/countries
-                currency = data['price_overview']['currency']
-                discount = data['price_overview']['discount_percent']
+                currency = data["price_overview"]["currency"]
+                discount = data["price_overview"]["discount_percent"]
                 money = Money(
                     country=country if country else "",
                     currency3l=currency,
-                    value_minor=int(data['price_overview']['final'])
+                    value_minor=int(data["price_overview"]["final"]),
                 )
 
             return GameResult(
@@ -153,7 +160,9 @@ class SteamClient:
                     "l": "english",
                 }
                 # https://store.steampowered.com/search/suggest?term=counter+strike&f=games&cc=US&realm=1&l=english
-                logging.info(f"Searching games URL: {self.API_GAME_SEARCH}?{urlencode(params)}")
+                logging.info(
+                    f"Searching games URL: {self.API_GAME_SEARCH}?{urlencode(params)}"
+                )
 
                 req = session.get(self.API_GAME_SEARCH, params=params)
                 tasks.append(req)
@@ -161,7 +170,7 @@ class SteamClient:
             return await asyncio.gather(*tasks)
 
     @async_lru_cache_ttl
-    async def getAppids(self, gamenames: Iterable[str],country):
+    async def getAppids(self, gamenames: Iterable[str], country):
         "analyzes html and returns dict of every appid found in the search for each given game name. empty keys (for now)"
         responses = await self._getGameSugestions(gamenames, country)
 
@@ -177,11 +186,13 @@ class SteamClient:
     async def _getGameDetailsFromAppid(self, appid, country, session) -> dict:
         """makes steam api details request for given appid and returns future for it's json response"""
         params = {
-            'appids':appid,
+            "appids": appid,
             "cc": country,
             "filters": "basic,price_overview",
         }
-        logging.info(f"Getting gamedetails json: {self.API_APP_DETAILS_URL}?{urlencode(params)}")
+        logging.info(
+            f"Getting gamedetails json: {self.API_APP_DETAILS_URL}?{urlencode(params)}"
+        )
         # https://store.steampowered.com/api/appdetails?appids=730&cc=US&filters=basic,price_overview
         async with session.get(self.API_APP_DETAILS_URL, params=params) as r:
             return await r.json()
@@ -196,7 +207,7 @@ class SteamClient:
         results = await asyncio.gather(*tasks)
         return results
 
-    async def scrapeGameResults(self, query: str, country:str) -> ScrapeResult:
+    async def scrapeGameResults(self, query: str, country: str) -> ScrapeResult:
         """gets game details for each appid found in the search for the given
         query(game name) and makes GameResult obj from each of those and returns a list of them all
         """
@@ -205,14 +216,17 @@ class SteamClient:
 
         async with aiohttp.ClientSession() as session:
             gamedetails, protondbs = await asyncio.gather(
-                self._getAllGameDetails(appids,country, session),
+                self._getAllGameDetails(appids, country, session),
                 ProtonDBClient.getReports(appids),
             )
             # hopefully, their order is the same
 
             raw_results = [
                 SteamClient._makeGameResult(
-                    gameDetail, desiredType="game", protonDBReport=protondb,country=country
+                    gameDetail,
+                    desiredType="game",
+                    protonDBReport=protondb,
+                    country=country,
                 )
                 for gameDetail, protondb in zip(gamedetails, protondbs)
             ]

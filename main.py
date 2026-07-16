@@ -11,7 +11,13 @@ import sys
 from logging import basicConfig, WARNING, INFO, DEBUG
 import logging
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
-from telegram.ext import CallbackQueryHandler, Updater, InlineQueryHandler, CommandHandler,Application
+from telegram.ext import (
+    CallbackQueryHandler,
+    Updater,
+    InlineQueryHandler,
+    CommandHandler,
+    Application,
+)
 from telegram import InlineQueryResultArticle, InputTextMessageContent
 import sqlite3
 import time
@@ -50,7 +56,6 @@ async def help(update: Update, context):
     )
 
 
-
 async def error(update: Update, context):
     print(f"Update {update} caused error {context.error}")
 
@@ -75,8 +80,6 @@ def main():
     application.add_handler(CommandHandler("setcurrency", bot.set_currency))
     application.add_handler(CommandHandler("deleteinfo", bot.delete_user_info))
     application.add_handler(CallbackQueryHandler(bot.callback_handler))
-
-
 
     application.add_error_handler(error)  # type:ignore
 

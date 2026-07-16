@@ -4,7 +4,8 @@ from typing import Optional
 from modules.GameResult import GameResult
 from modules.services import Money
 from modules.services.ProtonDBClient import ProtonDBReport, ProtonDBTier
-import time 
+import time
+
 
 class GameResultRepository:
     def __init__(self, db: sqlite3.Connection):
@@ -113,7 +114,7 @@ class GameResultRepository:
                 total=total,
                 trendingTier=ProtonDBTier(int(trendingTier)),
             )
-        
+
         price = Money.Money(
             country=country, currency3l=currency, value_minor=price_minor
         )
@@ -126,5 +127,5 @@ class GameResultRepository:
             is_free=bool(is_free),
             discount=discount,
             protonDBReport=report,
-            country=country
+            country=country,
         )

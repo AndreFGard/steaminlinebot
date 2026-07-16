@@ -5,7 +5,7 @@ import asyncio
 from functools import wraps
 
 
-def async_lru_cache_ttl(f: Callable, maxsize=5000, delta_s=60*60*48):
+def async_lru_cache_ttl(f: Callable, maxsize=5000, delta_s=60 * 60 * 48):
     cache: dict[Tuple, Tuple[float, float, Any]] = {}
     heap: List[Tuple[float, Tuple]] = []
     lock = asyncio.Lock()

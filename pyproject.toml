@@ -13,3 +13,9 @@ dependencies = [
     "pydantic>=2.13.4",
     "python-telegram-bot>=22.8",
 ]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.411",
+    "ruff>=0.15.22",
+]
