@@ -1,10 +1,12 @@
-import sqlite3
 import logging
+import sqlite3
+import time
 from typing import Optional
+
 from modules.GameResult import GameResult
 from modules.services import Money
 from modules.services.ProtonDBClient import ProtonDBReport, ProtonDBTier
-import time 
+
 
 class GameResultRepository:
     def __init__(self, db: sqlite3.Connection):
@@ -36,8 +38,8 @@ class GameResultRepository:
             game_id = cur.lastrowid
             assert game_id
 
-            if game.protonDBReport:
-                self._insert_protondb_report(game_id, game.protonDBReport)
+            if game.proton_db_report:
+                self._insert_protondb_report(game_id, game.proton_db_report)
 
             return game_id
 
@@ -59,12 +61,12 @@ class GameResultRepository:
             """,
             (
                 gameresult_id,
-                report.bestReportedTier,
+                report.best_reported_tier,
                 report.confidence,
                 report.score,
                 report.tier,
                 report.total,
-                report.trendingTier,
+                report.trending_tier,
             ),
         )
 
@@ -94,26 +96,26 @@ class GameResultRepository:
             discount,
             date,
             country,
-            bestReportedTier,
+            best_reported_tier,
             confidence,
             score,
             tier,
             total,
-            trendingTier,
+            trending_tier,
             currency,
         ) = row
 
         report = None
-        if bestReportedTier is not None:
+        if best_reported_tier is not None:
             report = ProtonDBReport(
-                bestReportedTier=ProtonDBTier(int(bestReportedTier)),
+                best_reported_tier=ProtonDBTier(int(best_reported_tier)),
                 confidence=confidence,
                 score=score,
                 tier=ProtonDBTier(int(tier)),
                 total=total,
-                trendingTier=ProtonDBTier(int(trendingTier)),
+                trending_tier=ProtonDBTier(int(trending_tier)),
             )
-        
+
         price = Money.Money(
             country=country, currency3l=currency, value_minor=price_minor
         )
@@ -125,6 +127,6 @@ class GameResultRepository:
             price=price,
             is_free=bool(is_free),
             discount=discount,
-            protonDBReport=report,
-            country=country
+            proton_db_report=report,
+            country=country,
         )

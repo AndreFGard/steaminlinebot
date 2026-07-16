@@ -5,21 +5,33 @@
 @Steaminlinebot written by GuaximFsg (now AndreFGard) on github
 """
 
-from functools import cache
+import logging
 import os
 import sys
-from logging import basicConfig, WARNING, INFO, DEBUG
-import logging
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
-from telegram.ext import CallbackQueryHandler, Updater, InlineQueryHandler, CommandHandler,Application
-from telegram import InlineQueryResultArticle, InputTextMessageContent
-import sqlite3
 import time
+from functools import cache
+from logging import DEBUG, INFO, WARNING, basicConfig
 
-from modules.db import init_db
-from modules.GameResult import GameResult
+import sqlite3
+
+from telegram import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    InlineQueryResultArticle,
+    InputTextMessageContent,
+    Update,
+)
+from telegram.ext import (
+    Application,
+    CallbackQueryHandler,
+    CommandHandler,
+    InlineQueryHandler,
+    Updater,
+)
 
 from modules.Bot import Bot
+from modules.GameResult import GameResult
+from modules.db import init_db
 
 
 logLevel = {""}
@@ -50,7 +62,6 @@ async def help(update: Update, context):
     )
 
 
-
 async def error(update: Update, context):
     print(f"Update {update} caused error {context.error}")
 
@@ -70,13 +81,11 @@ def main():
     application.add_handler(CommandHandler("start", help))
     application.add_handler(CommandHandler("help", help))
 
-    application.add_handler(InlineQueryHandler(bot.handleInlineQuery))
+    application.add_handler(InlineQueryHandler(bot.handle_inline_query))
 
     application.add_handler(CommandHandler("setcurrency", bot.set_currency))
     application.add_handler(CommandHandler("deleteinfo", bot.delete_user_info))
     application.add_handler(CallbackQueryHandler(bot.callback_handler))
-
-
 
     application.add_error_handler(error)  # type:ignore
 

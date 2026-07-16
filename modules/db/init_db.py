@@ -1,7 +1,17 @@
-import sqlite3
 import json
-from pydantic import BaseModel
+import logging
+import re
+import sqlite3
+from decimal import Decimal
 from typing import Optional
+
+from babel.numbers import (
+    get_currency_precision,
+    get_territory_currencies,
+    parse_decimal,
+)
+import pydantic
+
 def init_db(path):
     db = sqlite3.connect(path)
     db.execute("PRAGMA foreign_keys = ON;")
@@ -54,8 +64,9 @@ def init_db(path):
     rev0_populate_countries(db)
     rev1_migrate_prices(db)
     return db
-import logging
-class GameResultRowv1(BaseModel):
+
+
+class GameResultRowv1(pydantic.BaseModel):
     appid: int
     id: int
     country: str
@@ -66,7 +77,7 @@ class GameResultRowv1(BaseModel):
     date: int
 
 
-class GameResultRowv2(BaseModel):
+class GameResultRowv2(pydantic.BaseModel):
     appid: int
     id: int
     country: Optional[str]
@@ -77,21 +88,15 @@ class GameResultRowv2(BaseModel):
     discount: Optional[str]
     date: int
 
-class CountryRow(BaseModel):
+
+class CountryRow(pydantic.BaseModel):
     language_2l: str
     country: str
     currency: str
 
-class GameResultRowCurrent(GameResultRowv2):
-    ...
 
-from babel.numbers import (
-    parse_decimal,
-    get_currency_precision,
-    get_territory_currencies
-)
-import re
-from decimal import Decimal
+class GameResultRowCurrent(GameResultRowv2): ...
+
 
 def _parse_price_minor(price: str, locale: str, currency: str) -> int:
     # strip symbols ($) but keep separators (,.)
@@ -125,10 +130,7 @@ def rev1_migrate_prices(db: sqlite3.Connection):
         WHERE country IS NOT NULL
     """).fetchall()
 
-    country_currency = {
-        c[0]: get_territory_currencies(c[0])[0]
-        for c in countries
-    }
+    country_currency = {c[0]: get_territory_currencies(c[0])[0] for c in countries}
 
     # add new columns first
     try:
@@ -153,46 +155,54 @@ def rev1_migrate_prices(db: sqlite3.Connection):
     """)
 
     for id_, price, country, language in rows:
-
         locale = f"{language.split('-')[0].lower()}_{country.upper()}"
         currency = country_currency[country]
 
         minor = _parse_price_minor(price, locale, currency)
 
-        db.execute("""
+        db.execute(
+            """
             UPDATE gameresults
             SET price_minor=?
             WHERE id=?
-        """, (minor, id_))
-    
-    #add currency
-    db.executemany("""
+        """,
+            (minor, id_),
+        )
+
+    # add currency
+    db.executemany(
+        """
         UPDATE countries
         SET currency=?
         WHERE country=?
-    """, (
-        (country_currency[c], c)
-        for c in country_currency))
-    
-    #change language standard to 2-letter codes
-    for  country,langIETF in db.execute("SELECT country,language_2l FROM countries"):
+    """,
+        ((country_currency[c], c) for c in country_currency),
+    )
+
+    # change language standard to 2-letter codes
+    for country, langIETF in db.execute("SELECT country,language_2l FROM countries"):
         lang2l = langIETF.split("-")[0].lower()
         try:
             currency = get_territory_currencies(country)[0]
         except:
             logging.error(f"Could not get currency for country {country}")
             currency = None
-        db.execute("""
+        db.execute(
+            """
             UPDATE countries
             SET language_2l=?,currency=?
             WHERE country=?
-        """, (lang2l,currency,country))
-    
+        """,
+            (lang2l, currency, country),
+        )
 
     db.execute("INSERT INTO schema_revision VALUES (1)")
     db.commit()
 
-def rev0_populate_countries(db: sqlite3.Connection, file: str = "modules/countries.json"):
+
+def rev0_populate_countries(
+    db: sqlite3.Connection, file: str = "modules/countries.json"
+):
     with open(file) as f:
         countries = json.load(f)["countries"]
 
@@ -210,6 +220,6 @@ def rev0_populate_countries(db: sqlite3.Connection, file: str = "modules/countri
     db.executemany(
         """
         INSERT OR IGNORE INTO countries (language_2l,country) VALUES (?,?)""",
-        [( r["language_2l"],r["code"]) for r in countries],
+        [(r["language_2l"], r["code"]) for r in countries],
     )
     db.commit()

@@ -1,11 +1,12 @@
-from typing import List, Callable, Tuple, Any
-import heapq
 import time
-import asyncio
 from functools import wraps
+from typing import Any, Callable, List, Tuple
+
+import asyncio
+import heapq
 
 
-def async_lru_cache_ttl(f: Callable, maxsize=5000, delta_s=60*60*48):
+def async_lru_cache_ttl(f: Callable, maxsize=5000, delta_s=60 * 60 * 48):
     cache: dict[Tuple, Tuple[float, float, Any]] = {}
     heap: List[Tuple[float, Tuple]] = []
     lock = asyncio.Lock()

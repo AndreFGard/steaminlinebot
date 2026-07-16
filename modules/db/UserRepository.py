@@ -1,5 +1,7 @@
-import sqlite3
 import logging
+import sqlite3
+
+
 class UserRepository:
     def __init__(self, db: sqlite3.Connection):
         self.db = db
@@ -44,5 +46,3 @@ class UserRepository:
         except sqlite3.IntegrityError as e:
             logging.error(f"upsert user country error: {e}")
             raise e
-
-        

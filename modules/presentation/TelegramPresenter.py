@@ -1,21 +1,27 @@
 from collections import defaultdict
+from dataclasses import dataclass
 from os import replace
 from typing import Optional
+from uuid import uuid4
+
 from telegram import (
+    InlineKeyboardButton,
     InlineKeyboardMarkup,
     InlineQueryResult,
     InlineQueryResultArticle,
     InlineQueryResultsButton,
     InputTextMessageContent,
-    InlineKeyboardButton,
 )
-from uuid import uuid4
-from modules.GameResult import GameResult
-from dataclasses import dataclass
 
-from modules.services import SearchGames
-from modules.services.SearchGames import GameResultVM, ProtonDBVM, SearchResults, SpecialResults
+from modules.GameResult import GameResult
+from modules.services.SearchGames import (
+    GameResultVM,
+    ProtonDBVM,
+    SearchResults,
+    SpecialResults,
+)
 from modules.services.UserCountry import CountryConfig, CountryModification
+
 
 @dataclass
 class TelegramPresentation:
@@ -27,13 +33,15 @@ class TelegramPresentation:
         if self.parse_mode not in ["HTML", "Markdown"]:
             raise ValueError("parse_mode must be either 'HTML' or 'Markdown'")
 
-@dataclass
-class TelegramInlineArticlePres(TelegramPresentation):
-    queryArticle: InlineQueryResultArticle
 
 @dataclass
-class TelegramCountryPres(TelegramPresentation):
-    ...
+class TelegramInlineArticlePres(TelegramPresentation):
+    query_article: InlineQueryResultArticle
+
+
+@dataclass
+class TelegramCountryPres(TelegramPresentation): ...
+
 
 @dataclass
 class TelegramInlineResultListPres:
@@ -43,57 +51,66 @@ class TelegramInlineResultListPres:
 
 class TelegramCallbackBuilder:
     @staticmethod
-    def setcurrency(countrycode):
-        return f"setcurrency {countrycode}"
+    def set_currency(country_code):
+        return f"setcurrency {country_code}"
+
 
 class TelegramPresenter:
     @staticmethod
-    def _presentProtonDBVM(protondb: ProtonDBVM|None):
-        if not protondb: return ''
-        tierEmoji = protondb.tier.to_emoji()
+    def _present_proton_db_vm(protondb: ProtonDBVM | None):
+        if not protondb:
+            return ""
+        tier_emoji = protondb.tier.to_emoji()
 
         text = (
             f"[ProtonDB Tier](https://www.protondb.com/app/{protondb.appid}): {str(protondb.tier)}"
             f" {'📈' if protondb.positive_trend else '📉'}"
-            f"{tierEmoji}"
-            f"\t({protondb.totalReports} reports)"
+            f"{tier_emoji}"
+            f"\t({protondb.total_reports} reports)"
         )
         return text
+
     @staticmethod
-    def _gamePriceLine(game:GameResultVM):
+    def _game_price_line(game: GameResultVM):
         price = (
-            "Price: FREE" if game.is_free else
-            f"Price: {game.price}" if game.price is not None else
-            "Not purchasable")
+            "Price: FREE"
+            if game.is_free
+            else f"Price: {game.price}"
+            if game.price is not None
+            else "Not purchasable"
+        )
         return price
+
     @staticmethod
-    def _presentGameResultVM(game: GameResultVM):
-        price = TelegramPresenter._gamePriceLine(game)
-        discount = f"\t\\[-{game.discount}%]" if game.discount is not None else ''
+    def _present_game_result_vm(game: GameResultVM):
+        price = TelegramPresenter._game_price_line(game)
+        discount = f"\t\\[-{game.discount}%]" if game.discount is not None else ""
 
         return (
-            f"[{game.title}]({game.link})" + '\n' +
-            price + discount + '\n' +
-            TelegramPresenter._presentProtonDBVM(game.protonDB)
+            f"[{game.title}]({game.link})"
+            + "\n"
+            + price
+            + discount
+            + "\n"
+            + TelegramPresenter._present_proton_db_vm(game.proton_db)
         )
 
     @staticmethod
-    def _makeInlineGameArticle(game: GameResultVM, countryConfig:CountryConfig):
-        keyboardMarkup = TelegramPresenter._makeKeyboardMarkup(
+    def _make_inline_game_article(game: GameResultVM, country_config: CountryConfig):
+        keyboard_markup = TelegramPresenter._make_keyboard_markup(
             appid=game.appid,
-            steamlink=game.link,
-            hasProtonDB=game.protonDB is not None
+            steam_link=game.link,
+            has_proton_db=game.proton_db is not None,
         )
-        
-        message_text = TelegramPresenter._presentGameResultVM(game)
 
+        message_text = TelegramPresenter._present_game_result_vm(game)
 
-        #this must be refactored asap.
+        # this must be refactored asap.
         # at this point it's soldered rather than coupled
-        queryResult= InlineQueryResultArticle(
+        query_result = InlineQueryResultArticle(
             id=str(uuid4()),
             title=game.title,
-            description=TelegramPresenter._gamePriceLine(game),
+            description=TelegramPresenter._game_price_line(game),
             thumbnail_url=(
                 f"https://cdn.akamai.steamstatic.com/steam/apps/"
                 f"{game.appid}/capsule_sm_120.jpg?t"
@@ -102,18 +119,20 @@ class TelegramPresenter:
                 parse_mode="Markdown",
                 message_text=message_text,
             ),
-            reply_markup=keyboardMarkup
+            reply_markup=keyboard_markup,
         )
 
         return TelegramInlineArticlePres(
-            queryArticle = queryResult,
+            query_article=query_result,
             text=message_text,
-            keyboard=keyboardMarkup,
-            parse_mode='Markdown'
+            keyboard=keyboard_markup,
+            parse_mode="Markdown",
         )
-    
+
     @staticmethod
-    def _makeSpecialInlineQueryResult(result: SpecialResults)->InlineQueryResultArticle:
+    def _make_special_inline_query_result(
+        result: SpecialResults,
+    ) -> InlineQueryResultArticle:
         match result:
             case SpecialResults.ERROR:
                 return ERROR_RESULT
@@ -123,100 +142,108 @@ class TelegramPresenter:
                 return NO_MATCHES_RESULT
 
     @staticmethod
-    def _makeInlineQueryResultsList(games:SearchResults, countryConfig:CountryConfig):
+    def _make_inline_query_results_list(
+        games: SearchResults, country_config: CountryConfig
+    ):
         articles = [
-            TelegramPresenter._makeInlineGameArticle(
-                game,
-                countryConfig
-            ).queryArticle
-            for game in games.results]
+            TelegramPresenter._make_inline_game_article(
+                game, country_config
+            ).query_article
+            for game in games.results
+        ]
         articles.extend(
-            TelegramPresenter._makeSpecialInlineQueryResult(r)
-            for r in games.specialResults
+            TelegramPresenter._make_special_inline_query_result(r)
+            for r in games.special_results
         )
-        button = None if not games.configureCountry else CHANGE_CURRENCY_BUTTON
+        button = None if not games.configure_country else CHANGE_CURRENCY_BUTTON
         return TelegramInlineResultListPres(
             button=button,
             results=articles,
-
         )
 
     @staticmethod
-    def makeInlineQueryPresentation(searchResults: SearchResults, countryConfig: CountryConfig) -> TelegramInlineResultListPres:
-        return TelegramPresenter._makeInlineQueryResultsList(searchResults, countryConfig)
+    def make_inline_query_presentation(
+        search_results: SearchResults, country_config: CountryConfig
+    ) -> TelegramInlineResultListPres:
+        return TelegramPresenter._make_inline_query_results_list(
+            search_results, country_config
+        )
 
     @staticmethod
-    def makeDeleteConfirmation(success: bool) -> TelegramPresentation:
+    def make_delete_confirmation(success: bool) -> TelegramPresentation:
         if success:
             text = "Your data has been deleted 🫡"
         else:
             text = "Failed to delete your data. Please report with /report"
-        
+
         return TelegramPresentation(
-            text=text,
-            keyboard=InlineKeyboardMarkup([]),
-            parse_mode="Markdown"
+            text=text, keyboard=InlineKeyboardMarkup([]), parse_mode="Markdown"
         )
-        
+
     @staticmethod
-    def _makeCountryKeyboard(codes:list[str]):
+    def _make_country_keyboard(codes: list[str]):
         keyboard = []
         for i in range(0, len(codes), 3):
             row = [
-                InlineKeyboardButton(code, callback_data=TelegramCallbackBuilder.setcurrency(code))
-                for code in codes[i:i+3]
+                InlineKeyboardButton(
+                    code, callback_data=TelegramCallbackBuilder.set_currency(code)
+                )
+                for code in codes[i : i + 3]
             ]
             keyboard.append(row)
         return InlineKeyboardMarkup(keyboard)
 
     @staticmethod
-    def makeCurrencyMessageFromCountry(countryMod: CountryModification):
-        if countryMod.configuredCountry or countryMod.requestedCountry:
-            if countryMod.configuredCountry:
-                text =f"Your currency has been set to {countryMod.configuredCountry}✅"
+    def make_currency_message_from_country(country_mod: CountryModification):
+        if country_mod.configured_country or country_mod.requested_country:
+            if country_mod.configured_country:
+                text = (
+                    f"Your currency has been set to {country_mod.configured_country}✅"
+                )
                 kb = InlineKeyboardMarkup([])
             else:
-                text =(
-                    f"Could not set currency to *{countryMod.requestedCountry}*. Is it a valid country code?"                
+                text = (
+                    f"Could not set currency to *{country_mod.requested_country}*. Is it a valid country code?"
                     "\nPerhaps you meant one of those:"
                 )
-                kb = TelegramPresenter._makeCountryKeyboard(countryMod.alternativeSuggestions)
+                kb = TelegramPresenter._make_country_keyboard(
+                    country_mod.alternative_suggestions
+                )
         else:
             text = (
                 "**How to set your currency:**\n"
                 "Use `/setcurrency CODE` (e.g., `/setcurrency US`).\n\n"
                 "Select one of the popular options below:"
             )
-            kb = TelegramPresenter._makeCountryKeyboard(countryMod.alternativeSuggestions)
-            
+            kb = TelegramPresenter._make_country_keyboard(
+                country_mod.alternative_suggestions
+            )
+
         return TelegramCountryPres(text=text, keyboard=kb, parse_mode="Markdown")
-    
 
     @staticmethod
-    def _makeKeyboardMarkup(appid, steamlink, hasProtonDB:bool):
-        row1buttons = [
-            InlineKeyboardButton("Steam Page", url=steamlink)
-        ]
-        
-        if hasProtonDB:
-            row1buttons.append(
+    def _make_keyboard_markup(appid, steam_link, has_proton_db: bool):
+        row1_buttons = [InlineKeyboardButton("Steam Page", url=steam_link)]
+
+        if has_proton_db:
+            row1_buttons.append(
                 InlineKeyboardButton(
-                    "ProtonDB 🐧",
-                    url=f"https://www.protondb.com/app/{appid}"
+                    "ProtonDB 🐧", url=f"https://www.protondb.com/app/{appid}"
                 )
             )
-        
-        row2buttons = [
+
+        row2_buttons = [
             InlineKeyboardButton(
-                "Price History",
-                url=f"https://steamdb.info/app/{appid}/#pricehistory"
+                "Price History", url=f"https://steamdb.info/app/{appid}/#pricehistory"
             )
         ]
-        
-        return InlineKeyboardMarkup([row1buttons, row2buttons])
-        
+
+        return InlineKeyboardMarkup([row1_buttons, row2_buttons])
+
+
 CHANGE_CURRENCY_BUTTON = InlineQueryResultsButton(
-    text="Change currency / hide this", start_parameter="/setcurrency")
+    text="Change currency / hide this", start_parameter="/setcurrency"
+)
 
 ERROR_RESULT = InlineQueryResultArticle(
     id=str(uuid4()),

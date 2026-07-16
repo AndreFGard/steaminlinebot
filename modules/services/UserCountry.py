@@ -1,95 +1,98 @@
 import logging
-from sqlite3 import Connection
-
 from dataclasses import dataclass
-import time
-
-from telegram import Update
+from sqlite3 import Connection
+from typing import Optional
 
 from modules.db.UserRepository import UserRepository
-from modules.db.GameResultRepository import GameResultRepository
-from typing import Optional
 
 
 @dataclass
 class CountryModification:
-    configuredCountry: Optional[str]
-    requestedCountry: str
+    configured_country: Optional[str]
+    requested_country: str
     """Might be None if unsuccessful"""
-    alternativeSuggestions: list[str]
+    alternative_suggestions: list[str]
+
 
 @dataclass
 class CountryConfig:
     country: str
-    hasConfigured:bool
+    has_configured: bool
+
 
 class UserCountry:
-    def __init__(self, db:Connection):
-        self._userRepo = UserRepository(db)
+    def __init__(self, db: Connection):
+        self._user_repo = UserRepository(db)
 
-    def get_country(self, userId:int, fallback_languages=[]):
-        country = self._userRepo.get_user_country(userId)
-        has_set=True
+    def get_country(self, user_id: int, fallback_languages=None):
+        if fallback_languages is None:
+            fallback_languages = []
+        country = self._user_repo.get_user_country(user_id)
+        has_set = True
         if not country:
             has_set = False
-            for l in fallback_languages:
-                country = self._userRepo.get_country_by_language(l)
-                if country: break
+            for lang in fallback_languages:
+                country = self._user_repo.get_country_by_language(lang)
+                if country:
+                    break
 
-        if not country: country = "US"
-        return CountryConfig(country=country, hasConfigured=has_set)
+        if not country:
+            country = "US"
+        return CountryConfig(country=country, has_configured=has_set)
 
-    async def setCountry(self, userId: int, country:str, userLang:str):
-        requestedCountry = country
+    async def set_country(self, user_id: int, country: str, user_lang: str):
+        requested_country = country
         country = country.upper()
         try:
-            success = self._userRepo.upsert_user_country(userId, country)
-        except Exception as e :
+            success = self._user_repo.upsert_user_country(user_id, country)
+        except Exception as e:
             success = False
-            logging.error(f"setCountry error: {e}")
+            logging.error(f"set_country error: {e}")
         if success:
             return CountryModification(
-                configuredCountry=country,
-                requestedCountry=requestedCountry,
-                alternativeSuggestions=[])
-        
-        #language based suggestion
-        suggestion = self._userRepo.get_country_by_language(userLang)
+                configured_country=country,
+                requested_country=requested_country,
+                alternative_suggestions=[],
+            )
+
+        # language based suggestion
+        suggestion = self._user_repo.get_country_by_language(user_lang)
         codes = {"PT", "PL", "BR", "US"}
-        if suggestion: codes.add(suggestion)
+        if suggestion:
+            codes.add(suggestion)
 
         return CountryModification(
-            configuredCountry=country,
-            requestedCountry=requestedCountry,
-            alternativeSuggestions=list(reversed(list(codes))))
+            configured_country=country,
+            requested_country=requested_country,
+            alternative_suggestions=list(reversed(list(codes))),
+        )
 
-    def deleteUser(self, userId: int) -> bool:
+    def delete_user(self, user_id: int) -> bool:
         """Delete user data. Returns True if successful."""
         try:
-            self._userRepo.delete_user(userId)
+            self._user_repo.delete_user(user_id)
             return True
         except Exception as e:
-            logging.error(f"deleteUser error: {e}")
+            logging.error(f"delete_user error: {e}")
             return False
 
-    async def parseSetCurrencyCommand(self, args: list[str]|None, userId: int, langETF: str) -> CountryModification:
-        lang = langETF.split('-')[0].lower()
+    async def parse_set_currency_command(
+        self, args: list[str] | None, user_id: int, lang_etf: str
+    ) -> CountryModification:
+        lang = lang_etf.split("-")[0].lower()
 
         if args:
             requested_country = args[0]
-            return await self.setCountry(userId, requested_country, lang)
-        
+            return await self.set_country(user_id, requested_country, lang)
+
         # No args - provide suggestions
-        local_suggestion = self._userRepo.get_country_by_language(lang)
+        local_suggestion = self._user_repo.get_country_by_language(lang)
         target_codes = ["BR", "US", "MX", "PL"]
         if local_suggestion and local_suggestion not in target_codes:
             target_codes.insert(0, local_suggestion)
-        
+
         return CountryModification(
-            configuredCountry=None,
-            requestedCountry="",
-            alternativeSuggestions=target_codes
+            configured_country=None,
+            requested_country="",
+            alternative_suggestions=target_codes,
         )
-    
-
-
