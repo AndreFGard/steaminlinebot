@@ -13,8 +13,9 @@ class UserRepository:
         return cur.rowcount
 
     def get_country_by_language(self, language):
+        language = language.lower()
         row = self.db.execute(
-            "SELECT country from countries where language = ?",
+            "SELECT country from countries where language_2l = ?",
             (language.lower(),),
         ).fetchone()
         return row[0] if row else None

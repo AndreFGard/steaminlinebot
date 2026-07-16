@@ -8,10 +8,47 @@ from typing import Any, Callable, Iterable, List, Tuple
 import aiohttp
 from functools import wraps
 import time
- 
 from modules.async_lru_cache_ttl import async_lru_cache_ttl
-from modules.ProtonDBReport import ProtonDBReport, ProtonDBTier
-            
+
+class ProtonDBTier(IntEnum):
+    BORKED = 1
+    BRONZE = 2
+    SILVER = 3
+    GOLD = 4
+    PLATINUM = 5
+
+    def label(self):
+        return self.name.lower().capitalize()
+    
+    def __str__(self):
+        return self.label() 
+    
+    def to_emoji(self):
+        return {
+            "GOLD": "✔️(4/5)",
+            "SILVER": "✔️(3/5)",
+            "BRONZE": "🟡(2/5)",
+            "PLATINUM": "✅(5/5)",
+            "BORKED": "❌ (1/5)",
+        }[self.name]
+    
+    @classmethod
+    def from_int(cls, tier: int):
+        return cls(tier)
+
+@dataclass
+class ProtonDBReport:
+    bestReportedTier: ProtonDBTier
+    confidence: str
+    score: float
+    tier: ProtonDBTier
+    total: int
+    """Total number of reports"""
+    trendingTier: ProtonDBTier
+    def __repr__(self):
+        return str(self.__dict__)
+
+
 class ProtonDBClient:
 
     @staticmethod

@@ -2,7 +2,8 @@ import sqlite3
 import logging
 from typing import Optional
 from modules.GameResult import GameResult
-from modules.ProtonDBReport import ProtonDBReport, ProtonDBTier
+from modules.services import Money
+from modules.services.ProtonDBClient import ProtonDBReport, ProtonDBTier
 import time 
 
 class GameResultRepository:
@@ -18,14 +19,14 @@ class GameResultRepository:
             cur = self.db.execute(
                 """
                 INSERT INTO gameresults (
-                    appid, link, price, is_free, discount, date
+                    appid, link, price_minor, is_free, discount, date
                 )
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 (
                     game.appid,
                     game.link,
-                    game.price,
+                    game.price.value_minor if game.price else None,
                     int(game.is_free),
                     game.discount,
                     int(time.time()),
@@ -71,10 +72,11 @@ class GameResultRepository:
         row = self.db.execute(
             """
             SELECT
-                g.id, g.appid, g.link, g.price, g.is_free, g.discount, g.date,g.country,
-                p.bestReportedTier, p.confidence, p.score, p.tier, p.total, p.trendingTier
+                g.id, g.appid, g.link, g.price_minor, g.is_free, g.discount, g.date,g.country,
+                p.bestReportedTier, p.confidence, p.score, p.tier, p.total, p.trendingTier, c.currency
             FROM gameresults g
             LEFT JOIN protondbresults p ON p.id = g.id
+            LEFT JOIN countries c ON c.country = g.country
             WHERE g.id = ?
             """,
             (gameresult_id,),
@@ -87,7 +89,7 @@ class GameResultRepository:
             _id,
             appid,
             link,
-            price,
+            price_minor,
             is_free,
             discount,
             date,
@@ -98,6 +100,7 @@ class GameResultRepository:
             tier,
             total,
             trendingTier,
+            currency,
         ) = row
 
         report = None
@@ -110,6 +113,10 @@ class GameResultRepository:
                 total=total,
                 trendingTier=ProtonDBTier(int(trendingTier)),
             )
+        
+        price = Money.Money(
+            country=country, currency3l=currency, value_minor=price_minor
+        )
 
         return GameResult(
             appid=appid,
