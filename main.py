@@ -15,7 +15,6 @@ from telegram.ext import CallbackQueryHandler, Updater, InlineQueryHandler, Comm
 from telegram import InlineQueryResultArticle, InputTextMessageContent
 import sqlite3
 import time
-import dotenv
 
 from modules.db import init_db
 from modules.GameResult import GameResult
@@ -23,7 +22,6 @@ from modules.GameResult import GameResult
 from modules.Bot import Bot
 
 
-dotenv.load_dotenv()
 logLevel = {""}
 botname = os.environ.get("BOTNAME") or "@SteamInlineBot"
 basicConfig(
@@ -33,11 +31,9 @@ basicConfig(
     format="[%(levelname)s] %(asctime)s  %(name)s: %(message)s",
 )
 
-
 if not os.path.exists("./data"):
     logging.warning("Creating data directory")
     os.mkdir("./data")
-
 
 
 async def help(update: Update, context):

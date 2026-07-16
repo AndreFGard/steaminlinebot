@@ -1,8 +1,9 @@
 from typing import Iterable, Optional, Union
 from attr import dataclass
 from gazpacho.soup import Soup
-from modules.services.ProtonDBClient import ProtonDBClient, ProtonDBReport
 from bs4 import BeautifulSoup
+
+from modules.services.ProtonDBClient import ProtonDBClient, ProtonDBReport
 import aiohttp
 import asyncio
 from urllib.parse import quote_plus
