@@ -1,9 +1,8 @@
 from dataclasses import dataclass
 from sqlite3 import Connection
 
-from modules.async_lru_cache_ttl import async_lru_cache_ttl
-from modules.services.GGDealsClient import GGDealsAPI
-from modules.services.Money import Money
+from steaminlinebot.utils.async_lru_cache_ttl import async_lru_cache_ttl
+from steaminlinebot.user.Money import Money
 
 
 @dataclass

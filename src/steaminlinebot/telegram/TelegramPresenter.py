@@ -13,14 +13,14 @@ from telegram import (
     InputTextMessageContent,
 )
 
-from modules.GameResult import GameResult
-from modules.services.SearchGames import (
+from steaminlinebot.game.GameResult import GameResult
+from steaminlinebot.game.SearchGames import (
     GameResultVM,
     ProtonDBVM,
     SearchResults,
     SpecialResults,
 )
-from modules.services.UserCountry import CountryConfig, CountryModification
+from steaminlinebot.user.UserCountry import CountryConfig, CountryModification
 
 
 @dataclass

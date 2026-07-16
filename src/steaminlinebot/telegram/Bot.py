@@ -6,11 +6,11 @@ from typing import Any, Callable, Coroutine, Mapping
 from telegram import Update
 from telegram.ext import InvalidCallbackData
 
-from modules.db.GameResultRepository import IGameResultRepository
-from modules.db.UserRepository import IUserRepository
-from modules.presentation.TelegramPresenter import TelegramPresenter
-from modules.services.SearchGames import ISearchGames
-from modules.services.UserCountry import IUserCountry
+from steaminlinebot.database.GameResultRepository import IGameResultRepository
+from steaminlinebot.database.UserRepository import IUserRepository
+from steaminlinebot.telegram.TelegramPresenter import TelegramPresenter
+from steaminlinebot.game.SearchGames import ISearchGames
+from steaminlinebot.user.UserCountry import IUserCountry
 
 
 class Bot:

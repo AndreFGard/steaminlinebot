@@ -4,9 +4,9 @@ import time
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from modules.GameResult import GameResult
-from modules.services import Money
-from modules.services.ProtonDBClient import ProtonDBReport, ProtonDBTier
+from steaminlinebot.game.GameResult import GameResult
+from steaminlinebot.user import Money
+from steaminlinebot.integration.ProtonDBClient import ProtonDBReport, ProtonDBTier
 
 
 class IGameResultRepository(ABC):

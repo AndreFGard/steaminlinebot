@@ -2,7 +2,7 @@
 # This program is dedicated to the public domain under the GPL3 license.
 
 """
-@Steaminlinebot written by GuaximFsg (now AndreFGard) on github
+@Steaminlinebot written by Andrefgard on github
 """
 
 import logging
@@ -21,14 +21,14 @@ from telegram.ext import (
     InlineQueryHandler,
 )
 
-from modules.Bot import Bot
-from modules.db import init_db
-from modules.db.GameResultRepository import GameResultRepository
-from modules.db.UserRepository import UserRepository
-from modules.services.ProtonDBClient import ProtonDBClient
-from modules.services.SearchGames import SearchGames
-from modules.services.SteamClient import SteamClient
-from modules.services.UserCountry import UserCountry
+from steaminlinebot.telegram.Bot import Bot
+from steaminlinebot.database import init_db
+from steaminlinebot.database.GameResultRepository import GameResultRepository
+from steaminlinebot.database.UserRepository import UserRepository
+from steaminlinebot.integration.ProtonDBClient import ProtonDBClient
+from steaminlinebot.game.SearchGames import SearchGames
+from steaminlinebot.integration.SteamClient import SteamClient
+from steaminlinebot.user.UserCountry import UserCountry
 
 
 logLevel = {""}

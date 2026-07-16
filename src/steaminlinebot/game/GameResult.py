@@ -1,8 +1,8 @@
 from typing import Optional
 
 import pydantic
-from modules.services.Money import Money
-from modules.services.ProtonDBClient import ProtonDBReport
+from steaminlinebot.user.Money import Money
+from steaminlinebot.integration.ProtonDBClient import ProtonDBReport
 
 
 class GameResult(pydantic.BaseModel):

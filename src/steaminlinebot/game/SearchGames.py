@@ -5,12 +5,12 @@ from enum import Enum
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from modules.GameResult import GameResult
-from modules.db.GameResultRepository import IGameResultRepository
-from modules.db.UserRepository import IUserRepository
-from modules.services.ProtonDBClient import ProtonDBReport, ProtonDBTier
-from modules.services.SteamClient import ISteamClient
-from modules.services.UserCountry import IUserCountry
+from steaminlinebot.game.GameResult import GameResult
+from steaminlinebot.database.GameResultRepository import IGameResultRepository
+from steaminlinebot.database.UserRepository import IUserRepository
+from steaminlinebot.integration.ProtonDBClient import ProtonDBReport, ProtonDBTier
+from steaminlinebot.integration.SteamClient import ISteamClient
+from steaminlinebot.user.UserCountry import IUserCountry
 
 
 class ISearchGames(ABC):

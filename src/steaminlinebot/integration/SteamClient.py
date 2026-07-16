@@ -10,11 +10,11 @@ from attr import dataclass
 from bs4 import BeautifulSoup
 from gazpacho.soup import Soup
 
-from modules.GameResult import GameResult
-from modules.async_lru_cache_ttl import async_lru_cache_ttl
-from modules.services.Money import Money
-from modules.services.ProtonDBClient import IProtonDBClient
-from modules.services.ProtonDBClient import ProtonDBClient, ProtonDBReport
+from steaminlinebot.game.GameResult import GameResult
+from steaminlinebot.utils.async_lru_cache_ttl import async_lru_cache_ttl
+from steaminlinebot.user.Money import Money
+from steaminlinebot.integration.ProtonDBClient import IProtonDBClient
+from steaminlinebot.integration.ProtonDBClient import ProtonDBClient, ProtonDBReport
 
 API_APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails"
 

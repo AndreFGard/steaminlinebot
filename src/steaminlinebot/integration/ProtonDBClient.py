@@ -9,7 +9,7 @@ from typing import Any, Callable, Iterable, List, Tuple
 
 import aiohttp
 
-from modules.async_lru_cache_ttl import async_lru_cache_ttl
+from steaminlinebot.utils.async_lru_cache_ttl import async_lru_cache_ttl
 
 
 class IProtonDBClient(ABC):
