@@ -18,8 +18,7 @@ class IProtonDBClient(ABC):
     @abstractmethod
     async def get_reports(
         self, appids: Iterable[str]
-    ) -> list[None | ProtonDBReport]:
-        ...
+    ) -> list[None | ProtonDBReport]: ...
 
 
 class ProtonDBTier(IntEnum):

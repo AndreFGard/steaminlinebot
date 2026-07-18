@@ -14,12 +14,10 @@ class IUserCountry(ABC):
         self,
         user_id: int,
         fallback_languages: list[str] | None = None,
-    ) -> CountryConfig:
-        ...
+    ) -> CountryConfig: ...
 
     @abstractmethod
-    def delete_user(self, user_id: int) -> bool:
-        ...
+    def delete_user(self, user_id: int) -> bool: ...
 
     @abstractmethod
     async def parse_set_currency_command(
@@ -27,8 +25,7 @@ class IUserCountry(ABC):
         args: list[str] | None,
         user_id: int,
         lang_etf: str,
-    ) -> CountryModification:
-        ...
+    ) -> CountryModification: ...
 
 
 @dataclass

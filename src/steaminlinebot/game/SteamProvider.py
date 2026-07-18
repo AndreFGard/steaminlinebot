@@ -43,16 +43,9 @@ class GameResultVM:
     proton_db: Optional[ProtonDBVM]
 
 
-class SpecialResults(Enum):
-    NO_MATCHES = 1
-    ERROR = 2
-    QUERY_TOO_SHORT = 4
-
-
 @dataclass
 class SearchResults:
     results: list[GameResultVM]
-    special_results: list[SpecialResults]
     scrape_time: float
 
 
@@ -73,18 +66,9 @@ class SteamProvider(ISearchGames):
         errors = set()
         results: list[GameResultVM] = []
 
-        if len(query) < 3:
-            errors.add(SpecialResults.QUERY_TOO_SHORT)
-            return SearchResults(results, list(errors), 0.0)
-
         start = time.time()
         res = await self._client.scrape_game_results(query, country_code)
         end = time.time()
-
-        if res.found_error:
-            errors.add(SpecialResults.ERROR)
-        if not res.results:
-            errors.add(SpecialResults.NO_MATCHES)
 
         for r in res.results:
             try:

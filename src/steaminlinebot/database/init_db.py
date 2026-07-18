@@ -12,6 +12,7 @@ from babel.numbers import (
 )
 import pydantic
 
+
 def init_db(path):
     db = sqlite3.connect(path)
     db.execute("PRAGMA foreign_keys = ON;")
@@ -200,9 +201,7 @@ def rev1_migrate_prices(db: sqlite3.Connection):
     db.commit()
 
 
-def rev0_populate_countries(
-    db: sqlite3.Connection, file: str = "data/countries.json"
-):
+def rev0_populate_countries(db: sqlite3.Connection, file: str = "data/countries.json"):
     with open(file) as f:
         countries = json.load(f)["countries"]
 

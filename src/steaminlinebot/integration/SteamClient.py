@@ -72,8 +72,7 @@ class ISteamClient(ABC):
     """Scrapes Steam search results and fetches game details."""
 
     @abstractmethod
-    async def scrape_game_results(self, query: str, country: str) -> ScrapeResult:
-        ...
+    async def scrape_game_results(self, query: str, country: str) -> ScrapeResult: ...
 
 
 class SteamClient(ISteamClient):

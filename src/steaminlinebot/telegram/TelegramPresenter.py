@@ -11,14 +11,13 @@ from telegram import (
     InputTextMessageContent,
 )
 
+from steaminlinebot.game.GameSearchUsecase import SpecialResults
 from steaminlinebot.game.SteamProvider import (
     GameResultVM,
     ProtonDBVM,
     SearchResults,
-    SpecialResults,
 )
 from steaminlinebot.user.UserCountry import CountryConfig, CountryModification
-
 
 class ITelegramPresenter(ABC):
     """Builds Telegram API objects from domain view models.
@@ -30,7 +29,10 @@ class ITelegramPresenter(ABC):
 
     @abstractmethod
     def make_inline_query_presentation(
-        self, search_results: SearchResults, country_config: CountryConfig
+        self,
+        search_results: SearchResults,
+        special_results: list[SpecialResults],
+        country_config: CountryConfig,
     ) -> "TelegramInlineResultListPres": ...
 
     @abstractmethod
@@ -94,7 +96,9 @@ class TelegramPresenter(ITelegramPresenter):
         price = (
             "Price: FREE"
             if game.is_free
-            else f"Price: {game.price}" if game.price is not None else "Not purchasable"
+            else f"Price: {game.price}"
+            if game.price is not None
+            else "Not purchasable"
         )
         return price
 
@@ -158,14 +162,17 @@ class TelegramPresenter(ITelegramPresenter):
                 return _make_no_matches_result()
 
     def _make_inline_query_results_list(
-        self, games: SearchResults, country_config: CountryConfig
+        self,
+        games: SearchResults,
+        special_results: list[SpecialResults],
+        country_config: CountryConfig,
     ) -> TelegramInlineResultListPres:
         articles = [
             self._make_inline_game_article(game, country_config).query_article
             for game in games.results
         ]
         articles.extend(
-            self._make_special_inline_query_result(r) for r in games.special_results
+            self._make_special_inline_query_result(r) for r in special_results
         )
         button = (
             _make_change_currency_button()
@@ -178,9 +185,14 @@ class TelegramPresenter(ITelegramPresenter):
         )
 
     def make_inline_query_presentation(
-        self, search_results: SearchResults, country_config: CountryConfig
+        self,
+        search_results: SearchResults,
+        special_results: list[SpecialResults],
+        country_config: CountryConfig,
     ) -> TelegramInlineResultListPres:
-        return self._make_inline_query_results_list(search_results, country_config)
+        return self._make_inline_query_results_list(
+            search_results, special_results, country_config
+        )
 
     def make_delete_confirmation(self, success: bool) -> TelegramPresentation:
         if success:
@@ -193,7 +205,7 @@ class TelegramPresenter(ITelegramPresenter):
         )
 
     def _make_country_keyboard(self, codes: list[str]) -> InlineKeyboardMarkup:
-        keyboard = []
+        keyboard: list[list[InlineKeyboardButton]] = []
         for i in range(0, len(codes), 3):
             row = [
                 InlineKeyboardButton(

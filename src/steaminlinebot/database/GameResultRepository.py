@@ -13,12 +13,10 @@ class IGameResultRepository(ABC):
     """Data access for cached game results and ProtonDB reports."""
 
     @abstractmethod
-    def insert_game_result(self, game: GameResult) -> int:
-        ...
+    def insert_game_result(self, game: GameResult) -> int: ...
 
     @abstractmethod
-    def get_game_result(self, gameresult_id: int) -> Optional[GameResult]:
-        ...
+    def get_game_result(self, gameresult_id: int) -> Optional[GameResult]: ...
 
 
 class GameResultRepository(IGameResultRepository):
