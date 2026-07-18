@@ -77,10 +77,8 @@ def main():
     steam_client = SteamClient(max_results=6, protondb_client=protondb_client)
     user_country = UserCountry(user_repo=user_repo)
     search_games = SteamProvider(
-        searcher=steam_client,
+        client=steam_client,
         game_result_repo=game_result_repo,
-        user_repo=user_repo,
-        user_country=user_country,
     )
     bot = Bot(
         user_repo=user_repo,

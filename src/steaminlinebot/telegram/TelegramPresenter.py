@@ -153,7 +153,7 @@ class TelegramPresenter:
             TelegramPresenter._make_special_inline_query_result(r)
             for r in games.special_results
         )
-        button = None if not games.configure_country else MakeChangeCurrencyButton()
+        button = None if not country_config.has_configured else MakeChangeCurrencyButton()
         return TelegramInlineResultListPres(
             button=button,
             results=articles,

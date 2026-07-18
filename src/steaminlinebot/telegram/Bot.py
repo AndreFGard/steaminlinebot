@@ -14,6 +14,7 @@ from steaminlinebot.user.UserCountry import IUserCountry
 
 
 class Bot:
+    DEFAULT_COUNTRY_CODE = 'US'
     def __init__(
         self,
         user_repo: IUserRepository,
@@ -40,7 +41,7 @@ class Bot:
 
         country_config = self.user_country.get_country(user_id, fallback_languages)
         search_results = await self.search_games.search_game(
-            user_id, query, fallback_languages
+            query, country_code=country_config.country or self.DEFAULT_COUNTRY_CODE
         )
 
         presentation = TelegramPresenter.make_inline_query_presentation(
