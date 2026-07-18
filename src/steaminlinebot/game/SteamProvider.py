@@ -1,7 +1,6 @@
 import logging
 import time
 from dataclasses import dataclass
-from enum import Enum
 from abc import ABC, abstractmethod
 from typing import Optional
 
@@ -39,7 +38,7 @@ class GameResultVM:
     appid: str
     price: Optional[str]
     is_free: bool
-    discount: Optional[int]
+    discount: Optional[int] 
     proton_db: Optional[ProtonDBVM]
 
 
@@ -63,7 +62,6 @@ class SteamProvider(ISearchGames):
         query: str,
         country_code: str,
     ):
-        errors = set()
         results: list[GameResultVM] = []
 
         start = time.time()
@@ -100,6 +98,5 @@ class SteamProvider(ISearchGames):
                 )
             except Exception as e:
                 logging.info(f"Error at search_game when building Result: {e}")
-                errors.add(SpecialResults.ERROR)
 
-        return SearchResults(results, list(errors), end - start)
+        return SearchResults(results, end - start)

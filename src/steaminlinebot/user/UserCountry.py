@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from steaminlinebot.database.UserRepository import IUserRepository, UserRepository
+from steaminlinebot.database.UserRepository import IUserRepository
 
 
 class IUserCountry(ABC):
@@ -20,12 +20,11 @@ class IUserCountry(ABC):
     def delete_user(self, user_id: int) -> bool: ...
 
     @abstractmethod
-    async def parse_set_currency_command(
-        self,
-        args: list[str] | None,
-        user_id: int,
-        lang_etf: str,
+    async def set_country(
+        self, user_id: int, country: str, user_lang: str
     ) -> CountryModification: ...
+    @abstractmethod
+    async def get_country_by_language(self, language_code: str) -> str | None: ...
 
 
 @dataclass
@@ -46,6 +45,9 @@ class UserCountry(IUserCountry):
     def __init__(self, user_repo: IUserRepository):
         self._user_repo = user_repo
 
+    async def get_country_by_language(self, language_code: str):
+        return self._user_repo.get_country_by_language(language_code)
+
     def get_country(self, user_id: int, fallback_languages=None):
         if fallback_languages is None:
             fallback_languages = []
@@ -62,7 +64,9 @@ class UserCountry(IUserCountry):
             country = "US"
         return CountryConfig(country=country, has_configured=has_set)
 
-    async def set_country(self, user_id: int, country: str, user_lang: str):
+    async def set_country(
+        self, user_id: int, country: str, user_lang: str
+    ) -> CountryModification:
         requested_country = country
         country = country.upper()
         try:
@@ -97,24 +101,3 @@ class UserCountry(IUserCountry):
         except Exception as e:
             logging.error(f"delete_user error: {e}")
             return False
-
-    async def parse_set_currency_command(
-        self, args: list[str] | None, user_id: int, lang_etf: str
-    ) -> CountryModification:
-        lang = lang_etf.split("-")[0].lower()
-
-        if args:
-            requested_country = args[0]
-            return await self.set_country(user_id, requested_country, lang)
-
-        # No args - provide suggestions
-        local_suggestion = self._user_repo.get_country_by_language(lang)
-        target_codes = ["BR", "US", "MX", "PL"]
-        if local_suggestion and local_suggestion not in target_codes:
-            target_codes.insert(0, local_suggestion)
-
-        return CountryModification(
-            configured_country=None,
-            requested_country="",
-            alternative_suggestions=target_codes,
-        )

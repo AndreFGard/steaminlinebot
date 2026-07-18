@@ -27,9 +27,11 @@ from steaminlinebot.database import init_db
 from steaminlinebot.database.GameResultRepository import GameResultRepository
 from steaminlinebot.database.UserRepository import UserRepository
 from steaminlinebot.integration.ProtonDBClient import ProtonDBClient
+from steaminlinebot.game.GameSearchUsecase import GameSearchUsecase
 from steaminlinebot.game.SteamProvider import SteamProvider
 from steaminlinebot.integration.SteamClient import SteamClient
 from steaminlinebot.user.UserCountry import UserCountry
+from steaminlinebot.user.UserCountryUsecase import UserCountryUsecase
 
 logLevel = {""}
 botname = os.environ.get("BOTNAME") or "@SteamInlineBot"
@@ -82,10 +84,16 @@ def main():
         game_result_repo=game_result_repo,
     )
     presenter = TelegramPresenter()
-    bot = Bot(
-        search_games=search_games,
+    game_searcher = GameSearchUsecase(
         user_country=user_country,
+        search_games=search_games,
+        default_country_code="US",
+    )
+    user_country_usecase = UserCountryUsecase(user_country=user_country)
+    bot = Bot(
+        user_country_usecase=user_country_usecase,
         presenter=presenter,
+        game_searcher=game_searcher,
     )
 
     application = Application.builder().token(token).build()
