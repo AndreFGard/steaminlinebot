@@ -14,7 +14,7 @@ from telegram import (
 )
 
 from steaminlinebot.game.GameResult import GameResult
-from steaminlinebot.game.SearchGames import (
+from steaminlinebot.game.SteamProvider import (
     GameResultVM,
     ProtonDBVM,
     SearchResults,
@@ -75,9 +75,7 @@ class TelegramPresenter:
         price = (
             "Price: FREE"
             if game.is_free
-            else f"Price: {game.price}"
-            if game.price is not None
-            else "Not purchasable"
+            else f"Price: {game.price}" if game.price is not None else "Not purchasable"
         )
         return price
 
@@ -135,11 +133,11 @@ class TelegramPresenter:
     ) -> InlineQueryResultArticle:
         match result:
             case SpecialResults.ERROR:
-                return ERROR_RESULT
+                return MakeErrorResult()
             case SpecialResults.QUERY_TOO_SHORT:
-                return TOO_SHORT_RESULT
+                return MakeTooShortResult()
             case SpecialResults.NO_MATCHES:
-                return NO_MATCHES_RESULT
+                return MakeNoMatchesResult()
 
     @staticmethod
     def _make_inline_query_results_list(
@@ -155,7 +153,7 @@ class TelegramPresenter:
             TelegramPresenter._make_special_inline_query_result(r)
             for r in games.special_results
         )
-        button = None if not games.configure_country else CHANGE_CURRENCY_BUTTON
+        button = None if not games.configure_country else MakeChangeCurrencyButton()
         return TelegramInlineResultListPres(
             button=button,
             results=articles,
@@ -241,40 +239,47 @@ class TelegramPresenter:
         return InlineKeyboardMarkup([row1_buttons, row2_buttons])
 
 
-CHANGE_CURRENCY_BUTTON = InlineQueryResultsButton(
-    text="Change currency / hide this", start_parameter="/setcurrency"
-)
+def MakeChangeCurrencyButton():
+    return InlineQueryResultsButton(
+        text="Change currency / hide this", start_parameter="setcurrency"
+    )
 
-ERROR_RESULT = InlineQueryResultArticle(
-    id=str(uuid4()),
-    title="Error",
-    description=(
-        "Error: Sorry. Please report this with the /report command so we can fix it."
-    ),
-    input_message_content=InputTextMessageContent(
-        parse_mode="Markdown",
-        message_text=(
-            "Error: Something has gone wrong here. Please report this with the /report command so I can fix it."
+
+def MakeErrorResult():
+    return InlineQueryResultArticle(
+        id=str(uuid4()),
+        title="Error",
+        description=(
+            "Error: Sorry. Please report this with the /report command so we can fix it."
         ),
-    ),
-)
+        input_message_content=InputTextMessageContent(
+            parse_mode="Markdown",
+            message_text=(
+                "Error: Something has gone wrong here. Please report this with the /report command so I can fix it."
+            ),
+        ),
+    )
 
-TOO_SHORT_RESULT = InlineQueryResultArticle(
-    id=str(uuid4()),
-    title="Query Too Short",
-    description="Please enter more characters to search.",
-    input_message_content=InputTextMessageContent(
-        parse_mode="Markdown",
-        message_text="Your search query is too short. Please enter more characters.",
-    ),
-)
 
-NO_MATCHES_RESULT = InlineQueryResultArticle(
-    id=str(uuid4()),
-    title="No Matches Found",
-    description="No games matched your search.",
-    input_message_content=InputTextMessageContent(
-        parse_mode="Markdown",
-        message_text="No games matched your search. Try a different query.",
-    ),
-)
+def MakeTooShortResult():
+    return InlineQueryResultArticle(
+        id=str(uuid4()),
+        title="Query Too Short",
+        description="Please enter more characters to search.",
+        input_message_content=InputTextMessageContent(
+            parse_mode="Markdown",
+            message_text="Your search query is too short. Please enter more characters.",
+        ),
+    )
+
+
+def MakeNoMatchesResult():
+    return InlineQueryResultArticle(
+        id=str(uuid4()),
+        title="No Matches Found",
+        description="No games matched your search.",
+        input_message_content=InputTextMessageContent(
+            parse_mode="Markdown",
+            message_text="No games matched your search. Try a different query.",
+        ),
+    )

@@ -5,10 +5,9 @@ from enum import Enum
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from steaminlinebot.game.GameResult import GameResult
 from steaminlinebot.database.GameResultRepository import IGameResultRepository
 from steaminlinebot.database.UserRepository import IUserRepository
-from steaminlinebot.integration.ProtonDBClient import ProtonDBReport, ProtonDBTier
+from steaminlinebot.integration.ProtonDBClient import ProtonDBTier
 from steaminlinebot.integration.SteamClient import ISteamClient
 from steaminlinebot.user.UserCountry import IUserCountry
 
@@ -22,8 +21,7 @@ class ISearchGames(ABC):
         user_id: int,
         query: str,
         fallback_languages: list[str] | None = None,
-    ) -> SearchResults:
-        ...
+    ) -> SearchResults: ...
 
 
 @dataclass
@@ -62,7 +60,7 @@ class SearchResults:
     configure_country: bool
 
 
-class SearchGames(ISearchGames):
+class SteamProvider(ISearchGames):
     def __init__(
         self,
         searcher: ISteamClient,

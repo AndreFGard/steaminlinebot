@@ -26,10 +26,9 @@ from steaminlinebot.database import init_db
 from steaminlinebot.database.GameResultRepository import GameResultRepository
 from steaminlinebot.database.UserRepository import UserRepository
 from steaminlinebot.integration.ProtonDBClient import ProtonDBClient
-from steaminlinebot.game.SearchGames import SearchGames
+from steaminlinebot.game.SteamProvider import SteamProvider
 from steaminlinebot.integration.SteamClient import SteamClient
 from steaminlinebot.user.UserCountry import UserCountry
-
 
 logLevel = {""}
 botname = os.environ.get("BOTNAME") or "@SteamInlineBot"
@@ -46,7 +45,7 @@ if not os.path.exists("./data"):
 
 
 async def help(update: Update, context):
-    return await update.message.reply_text(  # type:ignore
+    return await update.message.reply_text(  # type: ignore
         f"To search with this bot, type {botname} and then something "
         f"you want to search in the message box. for example:\n"
         f"{botname} Skyrim\n"
@@ -77,7 +76,7 @@ def main():
     protondb_client = ProtonDBClient()
     steam_client = SteamClient(max_results=6, protondb_client=protondb_client)
     user_country = UserCountry(user_repo=user_repo)
-    search_games = SearchGames(
+    search_games = SteamProvider(
         searcher=steam_client,
         game_result_repo=game_result_repo,
         user_repo=user_repo,
@@ -101,7 +100,7 @@ def main():
     application.add_handler(CommandHandler("deleteinfo", bot.delete_user_info))
     application.add_handler(CallbackQueryHandler(bot.callback_handler))
 
-    application.add_error_handler(error)  # type:ignore
+    application.add_error_handler(error)  # type: ignore
 
     application.run_polling()
 

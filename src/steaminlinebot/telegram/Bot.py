@@ -9,7 +9,7 @@ from telegram.ext import InvalidCallbackData
 from steaminlinebot.database.GameResultRepository import IGameResultRepository
 from steaminlinebot.database.UserRepository import IUserRepository
 from steaminlinebot.telegram.TelegramPresenter import TelegramPresenter
-from steaminlinebot.game.SearchGames import ISearchGames
+from steaminlinebot.game.SteamProvider import ISearchGames
 from steaminlinebot.user.UserCountry import IUserCountry
 
 
@@ -96,6 +96,7 @@ class Bot:
     async def callback_handler(self, update: Update, context):
         query = update.callback_query
         if query and not isinstance(query, InvalidCallbackData):
+            # starts telegram loading animation
             await query.answer()
             # fail silently
             key = query.data.split(" ")[0] if query.data else "No callback data"
