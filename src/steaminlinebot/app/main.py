@@ -22,6 +22,7 @@ from telegram.ext import (
 )
 
 from steaminlinebot.telegram.Bot import Bot
+from steaminlinebot.telegram.TelegramPresenter import TelegramPresenter
 from steaminlinebot.database import init_db
 from steaminlinebot.database.GameResultRepository import GameResultRepository
 from steaminlinebot.database.UserRepository import UserRepository
@@ -80,11 +81,11 @@ def main():
         client=steam_client,
         game_result_repo=game_result_repo,
     )
+    presenter = TelegramPresenter()
     bot = Bot(
-        user_repo=user_repo,
-        game_result_repo=game_result_repo,
         search_games=search_games,
         user_country=user_country,
+        presenter=presenter,
     )
 
     application = Application.builder().token(token).build()

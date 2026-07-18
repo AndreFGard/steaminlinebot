@@ -6,26 +6,30 @@ from typing import Any, Callable, Coroutine, Mapping
 from telegram import Update
 from telegram.ext import InvalidCallbackData
 
-from steaminlinebot.database.GameResultRepository import IGameResultRepository
-from steaminlinebot.database.UserRepository import IUserRepository
-from steaminlinebot.telegram.TelegramPresenter import TelegramPresenter
+from steaminlinebot.telegram.TelegramPresenter import ITelegramPresenter
 from steaminlinebot.game.SteamProvider import ISearchGames
 from steaminlinebot.user.UserCountry import IUserCountry
 
 
 class Bot:
-    DEFAULT_COUNTRY_CODE = 'US'
+    """Telegram protocol handler.
+
+    Extracts parameters from PTB Update objects, delegates to domain
+    services, then asks the presenter to build Telegram API response
+    objects.  Zero knowledge of repositories or SQL.
+    """
+
+    DEFAULT_COUNTRY_CODE = "US"
+
     def __init__(
         self,
-        user_repo: IUserRepository,
-        game_result_repo: IGameResultRepository,
         search_games: ISearchGames,
         user_country: IUserCountry,
+        presenter: ITelegramPresenter,
     ):
-        self.user_repo = user_repo
-        self.game_result_repo = game_result_repo
         self.search_games = search_games
         self.user_country = user_country
+        self.presenter = presenter
         self._callback_handlers: Mapping[
             str, Callable[[Update, Any], Coroutine[Any, Any, Any]]
         ] = self._init_callback_handlers()
@@ -38,13 +42,13 @@ class Bot:
 
         user_id = update.inline_query.from_user.id
         fallback_languages = [update.inline_query.from_user.language_code, "en-us"]
-
         country_config = self.user_country.get_country(user_id, fallback_languages)
+        
         search_results = await self.search_games.search_game(
             query, country_code=country_config.country or self.DEFAULT_COUNTRY_CODE
         )
 
-        presentation = TelegramPresenter.make_inline_query_presentation(
+        presentation = self.presenter.make_inline_query_presentation(
             search_results, country_config
         )
         await update.inline_query.answer(
@@ -63,9 +67,8 @@ class Bot:
         user_id = msg.from_user.id
 
         success = self.user_country.delete_user(user_id)
-        presentation = TelegramPresenter.make_delete_confirmation(success)
+        presentation = self.presenter.make_delete_confirmation(success)
 
-        # Send to Telegram
         await msg.reply_text(presentation.text, parse_mode=presentation.parse_mode)
 
     async def set_currency(self, update: Update, context):
@@ -79,7 +82,7 @@ class Bot:
         country_mod = await self.user_country.parse_set_currency_command(
             args, user_id, user_lang
         )
-        presentation = TelegramPresenter.make_currency_message_from_country(country_mod)
+        presentation = self.presenter.make_currency_message_from_country(country_mod)
 
         await message.reply_text(
             presentation.text,
@@ -125,10 +128,10 @@ class Bot:
             args, user_id, user_lang
         )
 
-        presentation = TelegramPresenter.make_currency_message_from_country(country_mod)
+        presentation = self.presenter.make_currency_message_from_country(country_mod)
 
         await query.edit_message_text(
             presentation.text, parse_mode=presentation.parse_mode
         )
-        if presentation.keyboard.inline_keyboard:  # Only update if there are buttons
+        if presentation.keyboard.inline_keyboard:
             await query.edit_message_reply_markup(presentation.keyboard)
