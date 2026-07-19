@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Literal, Optional
 
 import pydantic
 from steaminlinebot.user.Money import Money
@@ -14,6 +14,9 @@ class GameResult(pydantic.BaseModel):
     country: Optional[str]
     discount: Optional[int]
     proton_db_report: Optional[ProtonDBReport] = None
+    product_type: Literal[
+        "game", "application", "tool", "demo", "dlc", "music", "mod"
+    ] = "game"
 
     def __repr__(self):
         return str(

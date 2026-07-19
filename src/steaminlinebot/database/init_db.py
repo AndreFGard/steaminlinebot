@@ -12,6 +12,7 @@ from babel.numbers import (
 )
 import pydantic
 
+
 def init_db(path):
     db = sqlite3.connect(path)
     db.execute("PRAGMA foreign_keys = ON;")
@@ -19,7 +20,7 @@ def init_db(path):
     db.executescript(
         """
         CREATE TABLE IF NOT EXISTS schema_revision(
-            version INTEGER
+            version INTEGER PRIMARY KEY
         );
         CREATE TABLE IF NOT EXISTS countries (
             language VARCHAR(5),
@@ -59,6 +60,10 @@ def init_db(path):
         );
         """
     )
+    db.commit()
+
+    # Ensure baseline revision exists for a fresh database.
+    db.execute("INSERT OR IGNORE INTO schema_revision (version) VALUES (0)")
     db.commit()
 
     rev0_populate_countries(db)
@@ -119,7 +124,7 @@ def rev1_migrate_prices(db: sqlite3.Connection):
         FROM schema_revision
     """).fetchone()[0]
 
-    if rev >= 1:
+    if rev >= 2:
         db.rollback()
         return
 
@@ -169,7 +174,6 @@ def rev1_migrate_prices(db: sqlite3.Connection):
             (minor, id_),
         )
 
-    # add currency
     db.executemany(
         """
         UPDATE countries
@@ -196,13 +200,11 @@ def rev1_migrate_prices(db: sqlite3.Connection):
             (lang2l, currency, country),
         )
 
-    db.execute("INSERT INTO schema_revision VALUES (1)")
+    db.execute("INSERT OR REPLACE INTO schema_revision (version) VALUES (2)")
     db.commit()
 
 
-def rev0_populate_countries(
-    db: sqlite3.Connection, file: str = "data/countries.json"
-):
+def rev0_populate_countries(db: sqlite3.Connection, file: str = "data/countries.json"):
     with open(file) as f:
         countries = json.load(f)["countries"]
 
@@ -213,13 +215,14 @@ def rev0_populate_countries(
         FROM schema_revision
     """).fetchone()[0]
 
-    if rev >= 0:
+    if rev >= 1:
         db.rollback()
         return
 
     db.executemany(
         """
-        INSERT OR IGNORE INTO countries (language_2l,country) VALUES (?,?)""",
-        [(r["language_2l"], r["code"]) for r in countries],
+        INSERT OR IGNORE INTO countries (language,country) VALUES (?,?)""",
+        [(r["language"], r["code"]) for r in countries],
     )
+    db.execute("INSERT OR REPLACE INTO schema_revision (version) VALUES (1)")
     db.commit()

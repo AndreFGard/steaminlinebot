@@ -13,12 +13,10 @@ class IGameResultRepository(ABC):
     """Data access for cached game results and ProtonDB reports."""
 
     @abstractmethod
-    def insert_game_result(self, game: GameResult) -> int:
-        ...
+    def insert_game_result(self, game: GameResult) -> int: ...
 
     @abstractmethod
-    def get_game_result(self, gameresult_id: int) -> Optional[GameResult]:
-        ...
+    def get_game_result(self, gameresult_id: int) -> Optional[GameResult]: ...
 
 
 class GameResultRepository(IGameResultRepository):
@@ -34,9 +32,9 @@ class GameResultRepository(IGameResultRepository):
             cur = self.db.execute(
                 """
                 INSERT INTO gameresults (
-                    appid, link, price_minor, is_free, discount, date
+                    appid, link, price_minor, is_free, discount, date, country
                 )
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     game.appid,
@@ -45,6 +43,7 @@ class GameResultRepository(IGameResultRepository):
                     int(game.is_free),
                     game.discount,
                     int(time.time()),
+                    game.country,
                 ),
             )
 

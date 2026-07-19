@@ -16,11 +16,12 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pyright>=1.1.411",
+    "pytest-asyncio>=0.21.0",
     "ruff>=0.15.22",
 ]
 
 [project.scripts]
-steaminlinebot = "steaminlinebot.app.main:main"
+bot = "steaminlinebot.app.main:main"
 
 [build-system]
 requires = ["uv_build>=0.11.29,<0.12"]

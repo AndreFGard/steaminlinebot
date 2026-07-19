@@ -3,6 +3,7 @@ from typing import Optional
 import aiohttp
 import pydantic
 
+
 class GGDealsAPIPrices(pydantic.BaseModel):
     current_retail: Optional[str] = None
     current_keyshops: Optional[str] = None

@@ -1,26 +1,57 @@
-from collections import defaultdict
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from os import replace
+from enum import Enum
 from typing import Optional
 from uuid import uuid4
 
 from telegram import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
-    InlineQueryResult,
     InlineQueryResultArticle,
     InlineQueryResultsButton,
     InputTextMessageContent,
 )
 
-from steaminlinebot.game.GameResult import GameResult
-from steaminlinebot.game.SearchGames import (
+from steaminlinebot.game.GameSearchUsecase import GameSearchResult
+from steaminlinebot.game.SteamProvider import (
     GameResultVM,
     ProtonDBVM,
-    SearchResults,
-    SpecialResults,
 )
 from steaminlinebot.user.UserCountry import CountryConfig, CountryModification
+
+
+class SpecialResults(Enum):
+    NO_MATCHES = 1
+    ERROR = 2
+    QUERY_TOO_SHORT = 4
+
+
+class ITelegramPresenter(ABC):
+    """Builds Telegram API objects from domain view models.
+
+    This is the inversion boundary: domain/services speak in view models,
+    the presenter translates them into Telegram API objects.
+    Mock this interface to test handlers without Telegram API objects.
+    """
+
+    @abstractmethod
+    def make_inline_query_presentation(
+        self,
+        result: GameSearchResult,
+    ) -> "TelegramInlineResultListPres": ...
+
+    @abstractmethod
+    def make_error_presentation(
+        self, error: "SpecialResults"
+    ) -> "TelegramInlineResultListPres": ...
+
+    @abstractmethod
+    def make_delete_confirmation(self, success: bool) -> "TelegramPresentation": ...
+
+    @abstractmethod
+    def make_currency_message_from_country(
+        self, country_mod: CountryModification
+    ) -> "TelegramCountryPres": ...
 
 
 @dataclass
@@ -49,15 +80,14 @@ class TelegramInlineResultListPres:
     button: Optional[InlineQueryResultsButton]
 
 
-class TelegramCallbackBuilder:
-    @staticmethod
-    def set_currency(country_code):
-        return f"setcurrency {country_code}"
+def MakeSetCurrencyCallback(country_code: str) -> str:
+    return f"setcurrency {country_code}"
 
 
-class TelegramPresenter:
-    @staticmethod
-    def _present_proton_db_vm(protondb: ProtonDBVM | None):
+class TelegramPresenter(ITelegramPresenter):
+    """Concrete implementation: builds real Telegram API objects."""
+
+    def _present_proton_db_vm(self, protondb: ProtonDBVM | None) -> str:
         if not protondb:
             return ""
         tier_emoji = protondb.tier.to_emoji()
@@ -70,8 +100,7 @@ class TelegramPresenter:
         )
         return text
 
-    @staticmethod
-    def _game_price_line(game: GameResultVM):
+    def _game_price_line(self, game: GameResultVM) -> str:
         price = (
             "Price: FREE"
             if game.is_free
@@ -81,9 +110,8 @@ class TelegramPresenter:
         )
         return price
 
-    @staticmethod
-    def _present_game_result_vm(game: GameResultVM):
-        price = TelegramPresenter._game_price_line(game)
+    def _present_game_result_vm(self, game: GameResultVM) -> str:
+        price = self._game_price_line(game)
         discount = f"\t\\[-{game.discount}%]" if game.discount is not None else ""
 
         return (
@@ -92,25 +120,26 @@ class TelegramPresenter:
             + price
             + discount
             + "\n"
-            + TelegramPresenter._present_proton_db_vm(game.proton_db)
+            + self._present_proton_db_vm(game.proton_db)
         )
 
-    @staticmethod
-    def _make_inline_game_article(game: GameResultVM, country_config: CountryConfig):
-        keyboard_markup = TelegramPresenter._make_keyboard_markup(
+    def _make_inline_game_article(
+        self, game: GameResultVM, country_config: CountryConfig
+    ) -> TelegramInlineArticlePres:
+        keyboard_markup = self._make_keyboard_markup(
             appid=game.appid,
             steam_link=game.link,
             has_proton_db=game.proton_db is not None,
         )
 
-        message_text = TelegramPresenter._present_game_result_vm(game)
+        message_text = self._present_game_result_vm(game)
 
         # this must be refactored asap.
         # at this point it's soldered rather than coupled
         query_result = InlineQueryResultArticle(
             id=str(uuid4()),
             title=game.title,
-            description=TelegramPresenter._game_price_line(game),
+            description=self._game_price_line(game),
             thumbnail_url=(
                 f"https://cdn.akamai.steamstatic.com/steam/apps/"
                 f"{game.appid}/capsule_sm_120.jpg?t"
@@ -129,48 +158,53 @@ class TelegramPresenter:
             parse_mode="Markdown",
         )
 
-    @staticmethod
     def _make_special_inline_query_result(
-        result: SpecialResults,
+        self, result: SpecialResults
     ) -> InlineQueryResultArticle:
         match result:
             case SpecialResults.ERROR:
-                return ERROR_RESULT
+                return _make_error_result()
             case SpecialResults.QUERY_TOO_SHORT:
-                return TOO_SHORT_RESULT
+                return _make_too_short_result()
             case SpecialResults.NO_MATCHES:
-                return NO_MATCHES_RESULT
+                return _make_no_matches_result()
 
-    @staticmethod
     def _make_inline_query_results_list(
-        games: SearchResults, country_config: CountryConfig
-    ):
+        self,
+        result: GameSearchResult,
+    ) -> TelegramInlineResultListPres:
         articles = [
-            TelegramPresenter._make_inline_game_article(
-                game, country_config
-            ).query_article
-            for game in games.results
+            self._make_inline_game_article(game, result.country_config).query_article
+            for game in result.search_results.results
         ]
-        articles.extend(
-            TelegramPresenter._make_special_inline_query_result(r)
-            for r in games.special_results
+        if not articles:
+            articles.append(
+                self._make_special_inline_query_result(SpecialResults.NO_MATCHES)
+            )
+
+        button = (
+            _make_change_currency_button()
+            if not result.country_config.has_configured
+            else None
         )
-        button = None if not games.configure_country else CHANGE_CURRENCY_BUTTON
         return TelegramInlineResultListPres(
             button=button,
             results=articles,
         )
 
-    @staticmethod
     def make_inline_query_presentation(
-        search_results: SearchResults, country_config: CountryConfig
+        self,
+        result: GameSearchResult,
     ) -> TelegramInlineResultListPres:
-        return TelegramPresenter._make_inline_query_results_list(
-            search_results, country_config
-        )
+        return self._make_inline_query_results_list(result)
 
-    @staticmethod
-    def make_delete_confirmation(success: bool) -> TelegramPresentation:
+    def make_error_presentation(
+        self, error: SpecialResults
+    ) -> TelegramInlineResultListPres:
+        article = self._make_special_inline_query_result(error)
+        return TelegramInlineResultListPres(results=[article], button=None)
+
+    def make_delete_confirmation(self, success: bool) -> TelegramPresentation:
         if success:
             text = "Your data has been deleted 🫡"
         else:
@@ -180,21 +214,19 @@ class TelegramPresenter:
             text=text, keyboard=InlineKeyboardMarkup([]), parse_mode="Markdown"
         )
 
-    @staticmethod
-    def _make_country_keyboard(codes: list[str]):
-        keyboard = []
+    def _make_country_keyboard(self, codes: list[str]) -> InlineKeyboardMarkup:
+        keyboard: list[list[InlineKeyboardButton]] = []
         for i in range(0, len(codes), 3):
             row = [
-                InlineKeyboardButton(
-                    code, callback_data=TelegramCallbackBuilder.set_currency(code)
-                )
+                InlineKeyboardButton(code, callback_data=MakeSetCurrencyCallback(code))
                 for code in codes[i : i + 3]
             ]
             keyboard.append(row)
         return InlineKeyboardMarkup(keyboard)
 
-    @staticmethod
-    def make_currency_message_from_country(country_mod: CountryModification):
+    def make_currency_message_from_country(
+        self, country_mod: CountryModification
+    ) -> TelegramCountryPres:
         if country_mod.configured_country or country_mod.requested_country:
             if country_mod.configured_country:
                 text = (
@@ -206,23 +238,20 @@ class TelegramPresenter:
                     f"Could not set currency to *{country_mod.requested_country}*. Is it a valid country code?"
                     "\nPerhaps you meant one of those:"
                 )
-                kb = TelegramPresenter._make_country_keyboard(
-                    country_mod.alternative_suggestions
-                )
+                kb = self._make_country_keyboard(country_mod.alternative_suggestions)
         else:
             text = (
                 "**How to set your currency:**\n"
                 "Use `/setcurrency CODE` (e.g., `/setcurrency US`).\n\n"
                 "Select one of the popular options below:"
             )
-            kb = TelegramPresenter._make_country_keyboard(
-                country_mod.alternative_suggestions
-            )
+            kb = self._make_country_keyboard(country_mod.alternative_suggestions)
 
         return TelegramCountryPres(text=text, keyboard=kb, parse_mode="Markdown")
 
-    @staticmethod
-    def _make_keyboard_markup(appid, steam_link, has_proton_db: bool):
+    def _make_keyboard_markup(
+        self, appid: str, steam_link: str, has_proton_db: bool
+    ) -> InlineKeyboardMarkup:
         row1_buttons = [InlineKeyboardButton("Steam Page", url=steam_link)]
 
         if has_proton_db:
@@ -241,40 +270,47 @@ class TelegramPresenter:
         return InlineKeyboardMarkup([row1_buttons, row2_buttons])
 
 
-CHANGE_CURRENCY_BUTTON = InlineQueryResultsButton(
-    text="Change currency / hide this", start_parameter="/setcurrency"
-)
+def _make_change_currency_button() -> InlineQueryResultsButton:
+    return InlineQueryResultsButton(
+        text="Change currency / hide this", start_parameter="setcurrency"
+    )
 
-ERROR_RESULT = InlineQueryResultArticle(
-    id=str(uuid4()),
-    title="Error",
-    description=(
-        "Error: Sorry. Please report this with the /report command so we can fix it."
-    ),
-    input_message_content=InputTextMessageContent(
-        parse_mode="Markdown",
-        message_text=(
-            "Error: Something has gone wrong here. Please report this with the /report command so I can fix it."
+
+def _make_error_result() -> InlineQueryResultArticle:
+    return InlineQueryResultArticle(
+        id=str(uuid4()),
+        title="Error",
+        description=(
+            "Error: Sorry. Please report this with the /report command so we can fix it."
         ),
-    ),
-)
+        input_message_content=InputTextMessageContent(
+            parse_mode="Markdown",
+            message_text=(
+                "Error: Something has gone wrong here. Please report this with the /report command so I can fix it."
+            ),
+        ),
+    )
 
-TOO_SHORT_RESULT = InlineQueryResultArticle(
-    id=str(uuid4()),
-    title="Query Too Short",
-    description="Please enter more characters to search.",
-    input_message_content=InputTextMessageContent(
-        parse_mode="Markdown",
-        message_text="Your search query is too short. Please enter more characters.",
-    ),
-)
 
-NO_MATCHES_RESULT = InlineQueryResultArticle(
-    id=str(uuid4()),
-    title="No Matches Found",
-    description="No games matched your search.",
-    input_message_content=InputTextMessageContent(
-        parse_mode="Markdown",
-        message_text="No games matched your search. Try a different query.",
-    ),
-)
+def _make_too_short_result() -> InlineQueryResultArticle:
+    return InlineQueryResultArticle(
+        id=str(uuid4()),
+        title="Query Too Short",
+        description="Please enter more characters to search.",
+        input_message_content=InputTextMessageContent(
+            parse_mode="Markdown",
+            message_text="Your search query is too short. Please enter more characters.",
+        ),
+    )
+
+
+def _make_no_matches_result() -> InlineQueryResultArticle:
+    return InlineQueryResultArticle(
+        id=str(uuid4()),
+        title="No Matches Found",
+        description="No games matched your search.",
+        input_message_content=InputTextMessageContent(
+            parse_mode="Markdown",
+            message_text="No games matched your search. Try a different query.",
+        ),
+    )
