@@ -20,46 +20,8 @@ API_APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails"
 
 
 # WIP that uses the search endpoint rather than the appdetails one
-async def _scrap_steam(query, max_results, cache_app: dict = {}):
-    results = []
-    req_start_T = time.time()
-    prefix = "https://store.steampowered.com/search/?term="
-    if len(query) < 3:
-        return
-    query = quote_plus(query)  # Properly URI-encode the query string
-    async with aiohttp.ClientSession() as session:
-        async with session.get(prefix + query + "&cc=US") as response:
-            page = await response.text()
-
-    download_end = time.time()
-    html = Soup(page)
-    # filtering for data-ds-appids results in not showing bundles, requiring
-    # appropriate filtering in the pricetags too, which is not implemented
-    tags = html.find("a", {"data-ds-tagids": ""}, mode="all")
-
-    if not tags:
-        return []
-
-    if not isinstance(tags, list):
-        tags = [tags]
-
-    for tag in tags[:max_results]:
-        # Extract game data from tag - you need to implement the actual parsing logic
-        # For now, this is a placeholder that needs to be replaced with actual scraping
-        try:
-            appid = tag.attrs.get("data-ds-appid", "")  # type:ignore
-            if appid:
-                # Fetch game details from API instead
-                pass
-        except:
-            continue
-    results_building_end = time.time()
-    results_buinding_total = results_building_end - download_end
-    req_t = download_end - req_start_T
-    print(f"answer building total time: {req_t + results_buinding_total}:")
-    print(f"\tpage download Time: {req_t}")
-    results_building_end = time.time()
-    return results
+# TODO: "https://store.steampowered.com/search/?term=" endpoint offers the appid and game data
+# which can be used to reduce the bot latency.
 
 
 @dataclass
@@ -75,6 +37,78 @@ class ISteamClient(ABC):
     async def scrape_game_results(self, query: str, country: str) -> ScrapeResult: ...
 
 
+def _parse_discount(price_str, discount_value: int):
+    """Parses discounts in different locales"""
+    e = Exception()
+    for valueidx in [0, 1]:
+        try:
+            if float(price_str.split()[valueidx].replace(",", ".")) == 0.0:
+                return None
+            else:
+                if float(discount_value) == 0.0:
+                    return None
+                discount = f"-{discount_value:.0f}%"
+                return discount
+        except Exception as ee:
+            e = ee
+    logging.warning(
+        f"Price parsing of price/discount: ('{price_str}','{discount_value}') error: {e}"
+    )
+    return None
+
+
+def _make_game_result(
+    game_details: dict,
+    proton_db_report: Optional[ProtonDBReport] = None,
+    country: Optional[str] = None,
+):
+    try:
+        appid: str = tuple(game_details.keys())[0]
+
+        if not game_details[appid]["success"]:
+            raise Exception(f"Unsuccessful game_details result: {game_details}")
+
+        link = f"https://store.steampowered.com/app/{appid}/"
+        data = game_details[appid]["data"]
+        title = data["name"]
+        product_type = data["type"]
+
+        is_free = False
+        discount = None
+
+        if data["is_free"]:
+            is_free = True
+            money = None
+        elif "price_overview" not in data:
+            money = None
+            discount = None
+        else:
+            # This is a WIP, as the value position changes based on locales/countries
+            currency = data["price_overview"]["currency"]
+            discount = data["price_overview"]["discount_percent"]
+            money = Money(
+                country=country if country else "",
+                currency3l=currency,
+                value_minor=int(data["price_overview"]["final"]),
+            )
+
+        return GameResult(
+            link=link,
+            title=title,
+            appid=appid,
+            price=money,
+            discount=discount,
+            proton_db_report=proton_db_report,
+            is_free=is_free,
+            country=country,
+            product_type=product_type,
+        )
+
+    except Exception as e:
+        logging.warning(f"Error in _make_game_result: {e}")
+        return None
+
+
 class SteamClient(ISteamClient):
     def __init__(
         self,
@@ -85,81 +119,6 @@ class SteamClient(ISteamClient):
         self.api_game_search = "https://store.steampowered.com/search/suggest"
         self.api_app_details_url = API_APP_DETAILS_URL
         self._protondb = protondb_client or ProtonDBClient()
-
-    @staticmethod
-    def _parse_discount(price_str, discount_value: int):
-        """Parses discounts in different locales"""
-        e = Exception()
-        for valueidx in [0, 1]:
-            try:
-                if float(price_str.split()[valueidx].replace(",", ".")) == 0.0:
-                    return None
-                else:
-                    if float(discount_value) == 0.0:
-                        return None
-                    discount = f"-{discount_value:.0f}%"
-                    return discount
-            except Exception as ee:
-                e = ee
-        logging.warning(
-            f"Price parsing of price/discount: ('{price_str}','{discount_value}') error: {e}"
-        )
-        return None
-
-    @staticmethod
-    def _make_game_result(
-        game_details: dict,
-        desired_type: str,
-        proton_db_report: Optional[ProtonDBReport] = None,
-        country: Optional[str] = None,
-    ):
-        try:
-            appid: str = tuple(game_details.keys())[0]
-
-            if not game_details[appid]["success"]:
-                raise Exception(f"Unsuccessful game_details result: {game_details}")
-
-            link = f"https://store.steampowered.com/app/{appid}/"
-            data = game_details[appid]["data"]
-            title = data["name"]
-            product_type = data["type"]
-            if product_type != desired_type:
-                raise Exception(f"Undesired Game type {product_type}")
-
-            has_price = False
-            is_free = False
-            discount = None
-
-            if data["is_free"]:
-                is_free = True
-                money = None
-            elif "price_overview" not in data:
-                money = None
-                discount = None
-            else:
-                # This is a WIP, as the value position changes based on locales/countries
-                currency = data["price_overview"]["currency"]
-                discount = data["price_overview"]["discount_percent"]
-                money = Money(
-                    country=country if country else "",
-                    currency3l=currency,
-                    value_minor=int(data["price_overview"]["final"]),
-                )
-
-            return GameResult(
-                link=link,
-                title=title,
-                appid=appid,
-                price=money,
-                discount=discount,
-                proton_db_report=proton_db_report,
-                is_free=is_free,
-                country=country,
-            )
-
-        except Exception as e:
-            logging.warning(f"Error in _make_game_result: {e}")
-            return None
 
     async def _get_game_suggestions(self, game_names: Iterable[str], country):
         async with aiohttp.ClientSession() as session:
@@ -237,9 +196,8 @@ class SteamClient(ISteamClient):
             # hopefully, their order is the same
 
             raw_results = [
-                SteamClient._make_game_result(
+                _make_game_result(
                     game_detail,
-                    desired_type="game",
                     proton_db_report=protondb,
                     country=country,
                 )

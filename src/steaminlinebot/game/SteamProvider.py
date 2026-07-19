@@ -38,7 +38,7 @@ class GameResultVM:
     appid: str
     price: Optional[str]
     is_free: bool
-    discount: Optional[int] 
+    discount: Optional[int]
     proton_db: Optional[ProtonDBVM]
 
 
@@ -69,6 +69,9 @@ class SteamProvider(ISearchGames):
         end = time.time()
 
         for r in res.results:
+            if r.product_type != "game":
+                continue
+
             try:
                 result_id = self._game_result_repo.insert_game_result(r)
 

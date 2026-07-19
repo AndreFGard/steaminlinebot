@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import logging
 
 from steaminlinebot.user.UserCountry import CountryModification, IUserCountry
 
@@ -18,7 +19,7 @@ class IUserCountryUsecase(ABC):
         self,
         user_id: int,
         user_language_etf: str | None,
-        country: str,
+        country: str | None,
     ) -> CountryModification: ...
 
     @abstractmethod
@@ -37,18 +38,29 @@ class UserCountryUsecase(IUserCountryUsecase):
         self,
         user_id: int,
         user_language_etf: str | None,
-        country: str,
+        country: str | None,
     ) -> CountryModification:
         """/setcurrency command, sending a keyboard, not callback"""
         user_language_etf = user_language_etf or "en-us"
         language_code = user_language_etf.split("-")[0].lower()
 
+        country = country or await self._user_country.get_country_by_language(
+            language_code
+        )
+        if country is None:
+            raise ValueError(
+                f"No country was provided nor obtained by the language {user_language_etf}"
+            )
+
         country_mod = await self._set_currency(country, user_id, language_code)
         return country_mod
 
     async def suggest_currencies(self, lang: str) -> CountryModification:
+        if not lang:
+            logging.warning("Suggesting default-based language")
+
         language_inferred_country = await self._user_country.get_country_by_language(
-            lang
+            lang or "en"
         )
         suggested_country_codes = ["BR", "US", "MX", "PL"]
         if language_inferred_country:

@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from enum import Enum
 from typing import Optional
 from uuid import uuid4
 
@@ -11,13 +12,19 @@ from telegram import (
     InputTextMessageContent,
 )
 
-from steaminlinebot.game.GameSearchUsecase import SpecialResults
+from steaminlinebot.game.GameSearchUsecase import GameSearchResult
 from steaminlinebot.game.SteamProvider import (
     GameResultVM,
     ProtonDBVM,
-    SearchResults,
 )
 from steaminlinebot.user.UserCountry import CountryConfig, CountryModification
+
+
+class SpecialResults(Enum):
+    NO_MATCHES = 1
+    ERROR = 2
+    QUERY_TOO_SHORT = 4
+
 
 class ITelegramPresenter(ABC):
     """Builds Telegram API objects from domain view models.
@@ -30,9 +37,12 @@ class ITelegramPresenter(ABC):
     @abstractmethod
     def make_inline_query_presentation(
         self,
-        search_results: SearchResults,
-        special_results: list[SpecialResults],
-        country_config: CountryConfig,
+        result: GameSearchResult,
+    ) -> "TelegramInlineResultListPres": ...
+
+    @abstractmethod
+    def make_error_presentation(
+        self, error: "SpecialResults"
     ) -> "TelegramInlineResultListPres": ...
 
     @abstractmethod
@@ -70,10 +80,8 @@ class TelegramInlineResultListPres:
     button: Optional[InlineQueryResultsButton]
 
 
-class TelegramCallbackBuilder:
-    @staticmethod
-    def set_currency(country_code: str) -> str:
-        return f"setcurrency {country_code}"
+def MakeSetCurrencyCallback(country_code: str) -> str:
+    return f"setcurrency {country_code}"
 
 
 class TelegramPresenter(ITelegramPresenter):
@@ -163,20 +171,19 @@ class TelegramPresenter(ITelegramPresenter):
 
     def _make_inline_query_results_list(
         self,
-        games: SearchResults,
-        special_results: list[SpecialResults],
-        country_config: CountryConfig,
+        result: GameSearchResult,
     ) -> TelegramInlineResultListPres:
         articles = [
-            self._make_inline_game_article(game, country_config).query_article
-            for game in games.results
+            self._make_inline_game_article(game, result.country_config).query_article
+            for game in result.search_results.results
         ]
-        articles.extend(
-            self._make_special_inline_query_result(r) for r in special_results
-        )
+        # articles.extend(
+        #     self._make_special_inline_query_result(r) for r in result.special_results
+        # )
+
         button = (
             _make_change_currency_button()
-            if not country_config.has_configured
+            if not result.country_config.has_configured
             else None
         )
         return TelegramInlineResultListPres(
@@ -186,13 +193,15 @@ class TelegramPresenter(ITelegramPresenter):
 
     def make_inline_query_presentation(
         self,
-        search_results: SearchResults,
-        special_results: list[SpecialResults],
-        country_config: CountryConfig,
+        result: GameSearchResult,
     ) -> TelegramInlineResultListPres:
-        return self._make_inline_query_results_list(
-            search_results, special_results, country_config
-        )
+        return self._make_inline_query_results_list(result)
+
+    def make_error_presentation(
+        self, error: SpecialResults
+    ) -> TelegramInlineResultListPres:
+        article = self._make_special_inline_query_result(error)
+        return TelegramInlineResultListPres(results=[article], button=None)
 
     def make_delete_confirmation(self, success: bool) -> TelegramPresentation:
         if success:
@@ -208,9 +217,7 @@ class TelegramPresenter(ITelegramPresenter):
         keyboard: list[list[InlineKeyboardButton]] = []
         for i in range(0, len(codes), 3):
             row = [
-                InlineKeyboardButton(
-                    code, callback_data=TelegramCallbackBuilder.set_currency(code)
-                )
+                InlineKeyboardButton(code, callback_data=MakeSetCurrencyCallback(code))
                 for code in codes[i : i + 3]
             ]
             keyboard.append(row)

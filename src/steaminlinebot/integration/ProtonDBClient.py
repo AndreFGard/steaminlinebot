@@ -62,28 +62,28 @@ class ProtonDBReport:
         return str(self.__dict__)
 
 
-class ProtonDBClient(IProtonDBClient):
-    @staticmethod
-    @async_lru_cache_ttl
-    async def _get_report(appid: str):
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"https://www.protondb.com/api/v1/reports/summaries/{appid}.json"
-            ) as res:
-                res.raise_for_status()
-                data = await res.json()
-                return ProtonDBReport(
-                    best_reported_tier=ProtonDBTier[data["bestReportedTier"].upper()],
-                    confidence=data["confidence"],
-                    score=data["score"],
-                    tier=ProtonDBTier[data["tier"].upper()],
-                    total=data["total"],
-                    trending_tier=ProtonDBTier[data["trendingTier"].upper()],
-                )
+@async_lru_cache_ttl
+async def _get_report(appid: str):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(
+            f"https://www.protondb.com/api/v1/reports/summaries/{appid}.json"
+        ) as res:
+            res.raise_for_status()
+            data = await res.json()
+            return ProtonDBReport(
+                best_reported_tier=ProtonDBTier[data["bestReportedTier"].upper()],
+                confidence=data["confidence"],
+                score=data["score"],
+                tier=ProtonDBTier[data["tier"].upper()],
+                total=data["total"],
+                trending_tier=ProtonDBTier[data["trendingTier"].upper()],
+            )
 
+
+class ProtonDBClient(IProtonDBClient):
     async def get_reports(self, appids: Iterable[str]) -> list[None | ProtonDBReport]:
         results = await asyncio.gather(
-            *(ProtonDBClient._get_report(appid) for appid in appids),
+            *(_get_report(appid) for appid in appids),
             return_exceptions=True,
         )
 
@@ -91,8 +91,8 @@ class ProtonDBClient(IProtonDBClient):
             x if isinstance(x, ProtonDBReport) else None for x in results
         ]
 
-        for result, appid in filter(
-            lambda x: isinstance(x[0], Exception), zip(results, appids)
+        for result, appid in (
+            x for x in zip(results, appids) if isinstance(x[0], Exception)
         ):
             logging.info(f"Error in protondb report of appid {appid}: {result}")
 
