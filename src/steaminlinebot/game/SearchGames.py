@@ -7,14 +7,13 @@ from typing import Optional
 
 from steaminlinebot.game.GameResult import GameResult
 from steaminlinebot.database.GameResultRepository import IGameResultRepository
-from steaminlinebot.database.UserRepository import IUserRepository
-from steaminlinebot.integration.ProtonDBClient import ProtonDBReport, ProtonDBTier
+from steaminlinebot.integration.ProtonDBClient import ProtonDBTier
 from steaminlinebot.integration.SteamClient import ISteamClient
 from steaminlinebot.user.UserCountry import IUserCountry
 
 
 class ISearchGames(ABC):
-    """Orchestrates game search: Steam scraping + ProtonDB + persistence."""
+    """Steam scraping + ProtonDB + persistence."""
 
     @abstractmethod
     async def search_game(
@@ -61,15 +60,39 @@ class SearchResults:
     configure_country: bool
 
 
+def to_game_result_vm(result: GameResult, result_id: int) -> GameResultVM:
+    """Pure function: maps a domain GameResult + its persisted ID to the view model."""
+    proton_db_vm = (
+        ProtonDBVM(
+            tier=result.proton_db_report.tier,
+            positive_trend=result.proton_db_report.trending_tier
+            > result.proton_db_report.tier,
+            total_reports=result.proton_db_report.total,
+            appid=result.appid,
+        )
+        if result.proton_db_report
+        else None
+    )
+
+    return GameResultVM(
+        id=result_id,
+        link=result.link,
+        title=result.title,
+        appid=result.appid,
+        price=result.price.present() if result.price else None,
+        is_free=result.is_free,
+        discount=result.discount,
+        proton_db=proton_db_vm,
+    )
+
+
 class SearchGames(ISearchGames):
     def __init__(
         self,
         searcher: ISteamClient,
         game_result_repo: IGameResultRepository,
-        user_repo: IUserRepository,
         user_country: IUserCountry,
     ):
-        self._user_repo = user_repo
         self._game_result_repo = game_result_repo
         self._searcher = searcher
         self._user_country = user_country
@@ -102,31 +125,7 @@ class SearchGames(ISearchGames):
         for r in res.results:
             try:
                 result_id = self._game_result_repo.insert_game_result(r)
-
-                proton_db_vm = (
-                    ProtonDBVM(
-                        tier=r.proton_db_report.tier,
-                        positive_trend=r.proton_db_report.trending_tier
-                        > r.proton_db_report.tier,
-                        total_reports=r.proton_db_report.total,
-                        appid=r.appid,
-                    )
-                    if r.proton_db_report
-                    else None
-                )
-
-                results.append(
-                    GameResultVM(
-                        id=result_id,
-                        link=r.link,
-                        title=r.title,
-                        appid=r.appid,
-                        price=r.price.present() if r.price else None,
-                        is_free=r.is_free,
-                        discount=r.discount,
-                        proton_db=proton_db_vm,
-                    )
-                )
+                results.append(to_game_result_vm(r, result_id))
             except Exception as e:
                 logging.info(f"Error at search_game when building Result: {e}")
                 errors.add(SpecialResults.ERROR)

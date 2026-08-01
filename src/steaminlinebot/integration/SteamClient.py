@@ -13,7 +13,7 @@ from steaminlinebot.user.Money import Money
 from steaminlinebot.integration.ProtonDBClient import IProtonDBClient
 from steaminlinebot.integration.ProtonDBClient import ProtonDBClient, ProtonDBReport
 
-# TODO: "https://store.steampowered.com/search/?term=" endpoint offers the appid and game data
+# TODO: "https://store.steampowered.com/search/?term=" endpoint also offers the appid and game data
 # which can be used to reduce the bot latency.
 
 
