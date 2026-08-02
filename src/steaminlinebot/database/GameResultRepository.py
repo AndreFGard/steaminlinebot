@@ -6,7 +6,10 @@ from typing import Optional
 
 from steaminlinebot.game.GameResult import GameResult
 from steaminlinebot.user import Money
-from steaminlinebot.integration.ProtonDBClient import ProtonDBReport, ProtonDBTier
+from steaminlinebot.integration.ProtonDBClient import (
+    ScrapedProtonDBReport,
+    ProtonDBTier,
+)
 
 
 class IGameResultRepository(ABC):
@@ -56,7 +59,7 @@ class GameResultRepository(IGameResultRepository):
             return game_id
 
     def _insert_protondb_report(
-        self, gameresult_id: int, report: ProtonDBReport
+        self, gameresult_id: int, report: ScrapedProtonDBReport
     ) -> None:
         self.db.execute(
             """
@@ -119,7 +122,7 @@ class GameResultRepository(IGameResultRepository):
 
         report = None
         if best_reported_tier is not None:
-            report = ProtonDBReport(
+            report = ScrapedProtonDBReport(
                 best_reported_tier=ProtonDBTier(int(best_reported_tier)),
                 confidence=confidence,
                 score=score,

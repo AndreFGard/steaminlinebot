@@ -2,7 +2,7 @@ from typing import Literal, Optional
 
 import pydantic
 from steaminlinebot.user.Money import Money
-from steaminlinebot.integration.ProtonDBClient import ProtonDBReport
+from steaminlinebot.integration.ProtonDBClient import ScrapedProtonDBReport
 
 
 class GameResult(pydantic.BaseModel):
@@ -13,7 +13,7 @@ class GameResult(pydantic.BaseModel):
     is_free: bool
     country: Optional[str]
     discount: Optional[int]
-    proton_db_report: Optional[ProtonDBReport] = None
+    proton_db_report: Optional[ScrapedProtonDBReport] = None
     product_type: Literal[
         "game", "application", "tool", "demo", "dlc", "music", "mod"
     ] = "game"

@@ -18,7 +18,7 @@ class IProtonDBClient(ABC):
     @abstractmethod
     async def get_reports(
         self, appids: Iterable[str]
-    ) -> list[None | ProtonDBReport]: ...
+    ) -> list[None | ScrapedProtonDBReport]: ...
 
 
 class ProtonDBTier(IntEnum):
@@ -49,7 +49,7 @@ class ProtonDBTier(IntEnum):
 
 
 @dataclass
-class ProtonDBReport:
+class ScrapedProtonDBReport:
     best_reported_tier: ProtonDBTier
     confidence: str
     score: float
@@ -70,7 +70,7 @@ async def _get_report(appid: str):
         ) as res:
             res.raise_for_status()
             data = await res.json()
-            return ProtonDBReport(
+            return ScrapedProtonDBReport(
                 best_reported_tier=ProtonDBTier[data["bestReportedTier"].upper()],
                 confidence=data["confidence"],
                 score=data["score"],
@@ -81,14 +81,16 @@ async def _get_report(appid: str):
 
 
 class ProtonDBClient(IProtonDBClient):
-    async def get_reports(self, appids: Iterable[str]) -> list[None | ProtonDBReport]:
+    async def get_reports(
+        self, appids: Iterable[str]
+    ) -> list[None | ScrapedProtonDBReport]:
         results = await asyncio.gather(
             *(_get_report(appid) for appid in appids),
             return_exceptions=True,
         )
 
-        filtered: list[None | ProtonDBReport] = [
-            x if isinstance(x, ProtonDBReport) else None for x in results
+        filtered: list[None | ScrapedProtonDBReport] = [
+            x if isinstance(x, ScrapedProtonDBReport) else None for x in results
         ]
 
         for result, appid in (

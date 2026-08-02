@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from babel.numbers import format_currency, get_currency_precision
 
 
+# TODO: delete this altogether
 @dataclass
 class Money:
     country: str

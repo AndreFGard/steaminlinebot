@@ -8,10 +8,12 @@ import aiohttp
 from attr import dataclass
 from bs4 import BeautifulSoup
 
-from steaminlinebot.game.GameResult import GameResult
-from steaminlinebot.user.Money import Money
+from steaminlinebot.game.GameResultV2 import ScrapedCost, ScrapedSteamGame
 from steaminlinebot.integration.ProtonDBClient import IProtonDBClient
-from steaminlinebot.integration.ProtonDBClient import ProtonDBClient, ProtonDBReport
+from steaminlinebot.integration.ProtonDBClient import (
+    ProtonDBClient,
+    ScrapedProtonDBReport,
+)
 
 # TODO: "https://store.steampowered.com/search/?term=" endpoint also offers the appid and game data
 # which can be used to reduce the bot latency.
@@ -20,7 +22,7 @@ from steaminlinebot.integration.ProtonDBClient import ProtonDBClient, ProtonDBRe
 @dataclass
 class ScrapeResult:
     found_error: Union[bool, Exception]
-    results: list[GameResult]
+    results: list[ScrapedSteamGame]
 
 
 class ISteamClient(ABC):
@@ -52,7 +54,7 @@ def _parse_discount(price_str, discount_value: int):
 
 def _make_game_result(
     game_details: dict,
-    proton_db_report: Optional[ProtonDBReport] = None,
+    proton_db_report: Optional[ScrapedProtonDBReport] = None,
     country: Optional[str] = None,
 ):
     try:
@@ -67,33 +69,29 @@ def _make_game_result(
         product_type = data["type"]
 
         is_free = False
-        discount = None
 
         if data["is_free"]:
             is_free = True
-            money = None
+            cost = None
         elif "price_overview" not in data:
-            money = None
-            discount = None
+            cost = None
         else:
-            # This is a WIP, as the value position changes based on locales/countries
-            currency = data["price_overview"]["currency"]
-            discount = data["price_overview"]["discount_percent"]
-            money = Money(
-                country=country if country else "",
-                currency3l=currency,
-                value_minor=int(data["price_overview"]["final"]),
+            overview = data["price_overview"]
+            cost = ScrapedCost(
+                value_minor=int(overview["final"]),
+                currency_3l=overview["currency"],
+                full_value_minor=int(overview["initial"]),
+                discount=overview["discount_percent"],
+                country_l2=country if country else "",
             )
 
-        return GameResult(
+        return ScrapedSteamGame(
             link=link,
             title=title,
             appid=appid,
-            price=money,
-            discount=discount,
+            cost=cost,
             proton_db_report=proton_db_report,
             is_free=is_free,
-            country=country,
             product_type=product_type,
         )
 
@@ -195,7 +193,7 @@ class SteamClient(ISteamClient):
 
     async def scrape_game_results(self, query: str, country: str) -> ScrapeResult:
         """gets game details for each appid found in the search for the given
-        query(game name) and makes GameResult obj from each of those and returns a list of them all
+        query(game name) and makes ScrapedGame obj from each of those and returns a list of them all
         """
         responses = await self._steam_request_maker.search_many_games_html(
             [query], country

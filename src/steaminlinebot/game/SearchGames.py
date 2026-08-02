@@ -1,11 +1,14 @@
 import logging
 import time
 from dataclasses import dataclass
+from decimal import Decimal
 from enum import Enum
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from steaminlinebot.game.GameResult import GameResult
+from babel.numbers import format_currency, get_currency_precision
+
+from steaminlinebot.game.GameResultV2 import ScrapedSteamGame
 from steaminlinebot.database.GameResultRepository import IGameResultRepository
 from steaminlinebot.integration.ProtonDBClient import ProtonDBTier
 from steaminlinebot.integration.SteamClient import ISteamClient
@@ -60,8 +63,8 @@ class SearchResults:
     configure_country: bool
 
 
-def to_game_result_vm(result: GameResult, result_id: int) -> GameResultVM:
-    """Pure function: maps a domain GameResult + its persisted ID to the view model."""
+def to_game_result_vm(result: ScrapedSteamGame, result_id: int) -> GameResultVM:
+    """Pure function: maps a scraped Steam game + its persisted ID to the view model."""
     proton_db_vm = (
         ProtonDBVM(
             tier=result.proton_db_report.tier,
@@ -74,14 +77,25 @@ def to_game_result_vm(result: GameResult, result_id: int) -> GameResultVM:
         else None
     )
 
+    if result.cost:
+        price_str = format_currency(
+            Decimal(result.cost.value_minor)
+            / Decimal(10 ** get_currency_precision(result.cost.currency_3l)),
+            result.cost.currency_3l,
+        )
+        discount = result.cost.discount
+    else:
+        price_str = None
+        discount = None
+
     return GameResultVM(
         id=result_id,
         link=result.link,
         title=result.title,
         appid=result.appid,
-        price=result.price.present() if result.price else None,
+        price=price_str,
         is_free=result.is_free,
-        discount=result.discount,
+        discount=discount,
         proton_db=proton_db_vm,
     )
 
