@@ -170,7 +170,7 @@ game_search_queries_table = sql.Table(
     "game_search_query",
     metadata,
     sql.Column("telegram_id", sql.Integer, primary_key=True),
-    sql.Column("game_id", sql.Integer, sql.ForeignKey("game_id.id")),
+    sql.Column("game_id", sql.Integer, sql.ForeignKey("game.id")),
     sql.Column("cost_id", sql.Integer, sql.ForeignKey("cost.id")),
     sql.Column("sender_user_id", sql.Integer, sql.ForeignKey("user.id")),
 )

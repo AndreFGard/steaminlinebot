@@ -2,7 +2,10 @@ from unittest.mock import MagicMock, patch
 
 from steaminlinebot.database.GameResultRepository import GameResultRepository
 from steaminlinebot.game.GameResult import GameResult
-from steaminlinebot.integration.ProtonDBClient import ProtonDBReport, ProtonDBTier
+from steaminlinebot.integration.ProtonDBClient import (
+    ScrapedProtonDBReport,
+    ProtonDBTier,
+)
 from steaminlinebot.user.Money import Money
 
 
@@ -18,7 +21,7 @@ def _make_game(
     is_free: bool = True,
     discount: int | None = None,
     country: str | None = "US",
-    proton_db_report: ProtonDBReport | None = None,
+    proton_db_report: ScrapedProtonDBReport | None = None,
 ) -> GameResult:
     return GameResult(
         appid=appid,
@@ -39,8 +42,8 @@ def _make_report(
     tier: ProtonDBTier = ProtonDBTier.GOLD,
     total: int = 1500,
     trending_tier: ProtonDBTier = ProtonDBTier.PLATINUM,
-) -> ProtonDBReport:
-    return ProtonDBReport(
+) -> ScrapedProtonDBReport:
+    return ScrapedProtonDBReport(
         best_reported_tier=best_reported_tier,
         confidence=confidence,
         score=score,
@@ -173,7 +176,7 @@ class TestGetGameResult:
             is_free=False,
             discount=50,
             country="US",
-            proton_db_report=ProtonDBReport(
+            proton_db_report=ScrapedProtonDBReport(
                 best_reported_tier=ProtonDBTier.GOLD,
                 confidence="Strong",
                 score=0.85,
