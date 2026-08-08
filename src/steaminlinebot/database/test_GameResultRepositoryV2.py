@@ -17,7 +17,6 @@ from steaminlinebot.game.ProtonDBReportV2 import ProtonDBReportV2, ProtonDBTier
 from steaminlinebot.integration.ProtonDBClient import ScrapedProtonDBReport
 
 
-
 def _setup_engine() -> "sqlalchemy.Engine":
     """Create an in-memory SQLite engine pre-seeded with ``country`` and ``game_source``."""
     engine = create_engine("sqlite://")
@@ -83,7 +82,9 @@ def _make_report(
         trending_tier=trending_tier,
     )
 
+
 # Keys stripped from models before comparison
+
 
 def _strip_ids(obj):
     """Recursively remove auto-generated ID keys (``id``, ``game_id``, etc.)."""
@@ -116,6 +117,7 @@ def assert_model_equal(actual, expected, msg: str = ""):
         f"actual (stripped):  {_strip_ids(actual)}\n"
         f"expected (stripped): {_strip_ids(expected)}"
     )
+
 
 class TestInsertFullGame:
     """Happy-path: game with cost + ProtonDB report."""

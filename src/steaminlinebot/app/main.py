@@ -98,7 +98,7 @@ def main():
 
     user_country_usecase = UserCountryUsecase(user_country=user_country)
     bot = Bot(
-        user_country_usecase=user_country_usecase,
+        user_country=user_country_usecase,
         presenter=presenter,
         game_searcher=game_searcher,
     )

@@ -8,7 +8,7 @@ from telegram.ext import CallbackContext, InvalidCallbackData
 
 from steaminlinebot.game.GameSearchUsecase import IGameSearchUsecase, QueryTooShortError
 from steaminlinebot.telegram.TelegramPresenter import ITelegramPresenter, SpecialResults
-from steaminlinebot.user.UserCountryUsecase import IUserCountryUsecase
+from steaminlinebot.user.UserCountry import IUserCountry
 
 
 class Bot:
@@ -16,11 +16,11 @@ class Bot:
 
     def __init__(
         self,
-        user_country_usecase: IUserCountryUsecase,
+        user_country: IUserCountry,
         presenter: ITelegramPresenter,
         game_searcher: IGameSearchUsecase,
     ):
-        self._user_country_usecase = user_country_usecase
+        self._user_country = user_country
         self._presenter = presenter
         self._game_searcher = game_searcher
         self._callback_handlers: Mapping[
@@ -36,7 +36,7 @@ class Bot:
 
         user_lang = update.inline_query.from_user.language_code
         if not user_lang:
-            suggested_langs = await self._user_country_usecase.suggest_currencies("")
+            suggested_langs = await self._user_country.suggest_currencies("")
             user_lang = suggested_langs.alternative_suggestions[0]
 
         try:
@@ -69,7 +69,7 @@ class Bot:
         assert msg and msg.from_user
         user_id = msg.from_user.id
 
-        success = await self._user_country_usecase.delete_user_info(user_id)
+        success = await self._user_country.delete_user(user_id)
         presentation = self._presenter.make_delete_confirmation(success)
 
         await msg.reply_text(presentation.text, parse_mode=presentation.parse_mode)
@@ -82,10 +82,10 @@ class Bot:
         assert message and message.from_user
         user_id = message.from_user.id
 
-        country_mod = await self._user_country_usecase.set_currency(
+        country_mod = await self._user_country.set_country(
             user_id,
-            user_language_etf=message.from_user.language_code,
-            country=context.args[0] if context.args else "",
+            user_lang_etf=message.from_user.language_code,
+            requested_country=context.args[0] if context.args else "",
         )
         presentation = self._presenter.make_currency_message_from_country(country_mod)
 
@@ -132,9 +132,7 @@ class Bot:
         if len(query.data.split()) == 2:
             country = query.data.split(" ")[1]
 
-        country_mod = await self._user_country_usecase.set_currency(
-            user_id, user_lang, country
-        )
+        country_mod = await self._user_country.set_country(user_id, country, user_lang)
 
         presentation = self._presenter.make_currency_message_from_country(country_mod)
 
