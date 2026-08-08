@@ -31,7 +31,6 @@ from steaminlinebot.game.GameSearchUsecase import GameSearchUsecase
 from steaminlinebot.game.SteamProvider import SteamProvider
 from steaminlinebot.integration.SteamClient import SteamClient, SteamRequestMaker
 from steaminlinebot.user.UserCountry import UserCountry
-from steaminlinebot.user.UserCountryUsecase import UserCountryUsecase
 
 logLevel = {""}
 botname = os.environ.get("BOTNAME") or "@SteamInlineBot"
@@ -96,9 +95,8 @@ def main():
         default_country_code="US",
     )
 
-    user_country_usecase = UserCountryUsecase(user_country=user_country)
     bot = Bot(
-        user_country=user_country_usecase,
+        user_country=user_country,
         presenter=presenter,
         game_searcher=game_searcher,
     )

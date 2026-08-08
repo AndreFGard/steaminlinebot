@@ -82,11 +82,16 @@ class Bot:
         assert message and message.from_user
         user_id = message.from_user.id
 
-        country_mod = await self._user_country.set_country(
-            user_id,
-            user_lang_etf=message.from_user.language_code,
-            requested_country=context.args[0] if context.args else "",
-        )
+        if context.args:
+            country_mod = await self._user_country.set_country(
+                user_id,
+                user_lang_etf=message.from_user.language_code,
+                requested_country=context.args[0],
+            )
+        else:
+            country_mod = await self._user_country.suggest_currencies(
+                message.from_user.language_code or "en"
+            )
         presentation = self._presenter.make_currency_message_from_country(country_mod)
 
         await message.reply_text(
