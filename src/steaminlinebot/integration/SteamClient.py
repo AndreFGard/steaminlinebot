@@ -8,7 +8,7 @@ import aiohttp
 from attr import dataclass
 from bs4 import BeautifulSoup
 
-from steaminlinebot.game.GameResultV2 import ScrapedCost, ScrapedSteamGame
+from steaminlinebot.game.GameResult import ScrapedCost, ScrapedSteamGame
 from steaminlinebot.integration.ProtonDBClient import IProtonDBClient
 from steaminlinebot.integration.ProtonDBClient import (
     ProtonDBClient,

@@ -4,9 +4,9 @@ from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from steaminlinebot.database.GameResultRepositoryV2 import IGameResultRepositoryV2
-from steaminlinebot.game import GameResultV2
-from steaminlinebot.game.GameResultV2 import ScrapedSteamGame
+from steaminlinebot.database.GameResultRepository import IGameResultRepository
+from steaminlinebot.game import GameResult
+from steaminlinebot.game.GameResult import ScrapedSteamGame
 from steaminlinebot.game.ProtonDBReportV2 import ProtonDBTier
 from steaminlinebot.integration.SteamClient import ISteamClient
 
@@ -34,7 +34,7 @@ class GameResultVM:
 
 
 # TODO this does not belong here as it's not steam specific
-def _gameresult_to_gameresultvm(game: GameResultV2.GameResultV2) -> GameResultVM:
+def _gameresult_to_gameresultvm(game: GameResult.GameResultV2) -> GameResultVM:
     # TODO see what code will be responsible for price formatting
     price = (
         None
@@ -85,12 +85,12 @@ class SteamProvider(ISearchGames):
     def __init__(
         self,
         client: ISteamClient,
-        game_result_repo: IGameResultRepositoryV2,
+        game_result_repo: IGameResultRepository,
     ):
         self._game_result_repo = game_result_repo
         self._client = client
 
-    def _insert_scraped_game(self, game: ScrapedSteamGame) -> GameResultV2.GameResultV2:
+    def _insert_scraped_game(self, game: ScrapedSteamGame) -> GameResult.GameResultV2:
         return self._game_result_repo.insert_game_result(game, "Steam")
 
     async def search_game(

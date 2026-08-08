@@ -13,7 +13,7 @@ from steaminlinebot.database.schema import (
     proton_report_table,
     ProductType_,
 )
-from steaminlinebot.game.GameResultV2 import (
+from steaminlinebot.game.GameResult import (
     CostData,
     GameResultV2,
     GameSourceInfo,
@@ -29,7 +29,7 @@ class SourceNotFoundError(LookupError):
     """Raised when a named game source is not found in game_source."""
 
 
-class IGameResultRepositoryV2(ABC):
+class IGameResultRepository(ABC):
     """Persists scraped game data and returns a fully-hydrated GameResultV2.
 
     Args:
@@ -50,7 +50,7 @@ class IGameResultRepositoryV2(ABC):
     ) -> GameResultV2: ...
 
 
-class GameResultRepository(IGameResultRepositoryV2):
+class GameResultRepository(IGameResultRepository):
     def __init__(self, engine: Engine):
         self._engine = engine
 

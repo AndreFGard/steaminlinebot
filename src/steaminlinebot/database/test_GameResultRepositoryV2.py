@@ -2,11 +2,11 @@ import pytest
 from sqlalchemy import create_engine
 import sqlalchemy
 from steaminlinebot.database.schema import metadata, game_source_table, country_table
-from steaminlinebot.database.GameResultRepositoryV2 import (
+from steaminlinebot.database.GameResultRepository import (
     GameResultRepository,
     SourceNotFoundError,
 )
-from steaminlinebot.game.GameResultV2 import (
+from steaminlinebot.game.GameResult import (
     ScrapedSteamGame,
     ScrapedCost,
     GameResultV2,
@@ -16,10 +16,6 @@ from steaminlinebot.game.GameResultV2 import (
 from steaminlinebot.game.ProtonDBReportV2 import ProtonDBReportV2, ProtonDBTier
 from steaminlinebot.integration.ProtonDBClient import ScrapedProtonDBReport
 
-
-# ===========================================================================
-# Test helpers
-# ===========================================================================
 
 
 def _setup_engine() -> "sqlalchemy.Engine":
@@ -35,7 +31,6 @@ def _setup_engine() -> "sqlalchemy.Engine":
 
 
 def _make_game(
-    *,
     appid: str = "730",
     link: str = "https://store.steampowered.com/app/730/",
     title: str = "Counter-Strike",
@@ -56,7 +51,6 @@ def _make_game(
 
 
 def _make_cost(
-    *,
     value_minor: int = 999,
     currency_3l: str = "USD",
     full_value_minor: int = 1999,
@@ -73,7 +67,6 @@ def _make_cost(
 
 
 def _make_report(
-    *,
     best_reported_tier: ProtonDBTier = ProtonDBTier.GOLD,
     confidence: str = "Strong",
     score: float = 0.9,
@@ -90,16 +83,7 @@ def _make_report(
         trending_tier=trending_tier,
     )
 
-
-# ---------------------------------------------------------------------------
-# Comparison helper — strips ``id`` fields recursively from pydantic models
-# (or plain dicts), then compares the remaining structure with plain ``==``.
-# ---------------------------------------------------------------------------
-
-
-# Keys stripped from models before comparison (auto-generated DB IDs)
-_ID_KEYS = {"id", "game_id"}
-
+# Keys stripped from models before comparison
 
 def _strip_ids(obj):
     """Recursively remove auto-generated ID keys (``id``, ``game_id``, etc.)."""
@@ -110,7 +94,9 @@ def _strip_ids(obj):
     else:
         return obj
 
-    result: dict = {}
+    _ID_KEYS = {"id", "game_id"}
+
+    result = {}
     for k, v in d.items():
         if k in _ID_KEYS:
             continue
@@ -130,12 +116,6 @@ def assert_model_equal(actual, expected, msg: str = ""):
         f"actual (stripped):  {_strip_ids(actual)}\n"
         f"expected (stripped): {_strip_ids(expected)}"
     )
-
-
-# ===========================================================================
-# insert_game_result  tests
-# ===========================================================================
-
 
 class TestInsertFullGame:
     """Happy-path: game with cost + ProtonDB report."""

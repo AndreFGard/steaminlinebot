@@ -21,8 +21,8 @@ from telegram.ext import (
     InlineQueryHandler,
 )
 
-from steaminlinebot.database.GameResultRepositoryV2 import GameResultRepository
-from steaminlinebot.database.UserRepositoryV2 import UserRepository
+from steaminlinebot.database.GameResultRepository import GameResultRepository
+from steaminlinebot.database.UserRepository import UserRepository
 from steaminlinebot.telegram.Bot import Bot
 from steaminlinebot.telegram.TelegramPresenter import TelegramPresenter
 from steaminlinebot.database import init_db

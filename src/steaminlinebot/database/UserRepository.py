@@ -1,10 +1,10 @@
+from abc import ABC, abstractmethod
 import logging
 
 from sqlalchemy import Connection, Engine, func, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from steaminlinebot.database.schema import country_table, user_table
-from steaminlinebot.database.IUserRepository import IUserRepository
 
 log = logging.getLogger(__name__)
 
@@ -16,6 +16,25 @@ def _ensure_user_exists(conn: Connection, telegram_id: int) -> None:
         .values(telegram_id=telegram_id)
         .on_conflict_do_nothing(index_elements=["telegram_id"])
     )
+
+
+class IUserRepository(ABC):
+    """Data access for Telegram users and country preferences."""
+
+    @abstractmethod
+    def delete_user(self, user_id: int) -> int: ...
+
+    # TODO: standardize a way to prefer larger countries (eg. US over Antartica, both are matches of "en")
+    @abstractmethod
+    def get_country_by_language(self, language: str) -> str | None:
+        """Return the alpha2 country code for a language-tag match. A match is said so when the language is a prefix of such."""
+        ...
+
+    @abstractmethod
+    def get_user_country(self, user_id: int) -> str | None: ...
+
+    @abstractmethod
+    def upsert_user_country(self, user_id: int, country_code: str) -> bool: ...
 
 
 class UserRepository(IUserRepository):
