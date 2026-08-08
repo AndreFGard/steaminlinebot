@@ -50,7 +50,7 @@ class IGameResultRepositoryV2(ABC):
     ) -> GameResultV2: ...
 
 
-class GameResultRepositoryV2(IGameResultRepositoryV2):
+class GameResultRepository(IGameResultRepositoryV2):
     def __init__(self, engine: Engine):
         self._engine = engine
 

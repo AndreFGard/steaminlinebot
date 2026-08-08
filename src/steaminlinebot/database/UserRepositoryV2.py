@@ -4,7 +4,7 @@ from sqlalchemy import Connection, Engine, func, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from steaminlinebot.database.schema import country_table, user_table
-from steaminlinebot.database.UserRepository import IUserRepository
+from steaminlinebot.database.IUserRepository import IUserRepository
 
 log = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ def _ensure_user_exists(conn: Connection, telegram_id: int) -> None:
     )
 
 
-class UserRepositoryV2(IUserRepository):
+class UserRepository(IUserRepository):
     """SQLAlchemy-backed user/country persistence.
 
     Implements the same ``IUserRepository`` interface as the legacy
