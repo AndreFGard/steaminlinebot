@@ -133,7 +133,7 @@ proton_report_table = sql.Table(
     "proton_report",
     metadata,
     sql.Column("id", sql.Integer, primary_key=True),
-    sql.Column("game_id", sql.ForeignKey("game.id")),
+    sql.Column("game_id", sql.Integer, sql.ForeignKey("game.id")),
     sql.Column(
         "source_id",
         sql.Integer,
@@ -179,6 +179,7 @@ country_table = sql.Table(
     "country",
     metadata,
     sql.Column("alpha2", sql.String(2), primary_key=True),
+    sql.Column("language", sql.String(10)),
 )
 
 

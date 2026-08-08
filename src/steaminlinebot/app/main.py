@@ -21,11 +21,11 @@ from telegram.ext import (
     InlineQueryHandler,
 )
 
+from steaminlinebot.database.GameResultRepositoryV2 import GameResultRepositoryV2
+from steaminlinebot.database.UserRepositoryV2 import UserRepositoryV2
 from steaminlinebot.telegram.Bot import Bot
 from steaminlinebot.telegram.TelegramPresenter import TelegramPresenter
 from steaminlinebot.database import init_db
-from steaminlinebot.database.GameResultRepository import GameResultRepository
-from steaminlinebot.database.UserRepository import UserRepository
 from steaminlinebot.integration.ProtonDBClient import ProtonDBClient
 from steaminlinebot.game.GameSearchUsecase import GameSearchUsecase
 from steaminlinebot.game.SteamProvider import SteamProvider
@@ -74,14 +74,16 @@ def main():
 
     db = init_db.init_db("data/db.sqlite")
 
-    user_repo = UserRepository(db)
-    game_result_repo = GameResultRepository(db)
+    game_result_repo = GameResultRepositoryV2(db)
     protondb_client = ProtonDBClient()
+
     steam_client = SteamClient(
         max_results=6,
         steam_request_maker=SteamRequestMaker(),
         protondb_client=protondb_client,
     )
+
+    user_repo = UserRepositoryV2(db)
     user_country = UserCountry(user_repo=user_repo)
     search_games = SteamProvider(
         client=steam_client,
@@ -93,6 +95,7 @@ def main():
         search_games=search_games,
         default_country_code="US",
     )
+
     user_country_usecase = UserCountryUsecase(user_country=user_country)
     bot = Bot(
         user_country_usecase=user_country_usecase,

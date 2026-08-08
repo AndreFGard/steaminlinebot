@@ -55,6 +55,11 @@ class UserCountry(IUserCountry):
         has_set = True
         if not country:
             has_set = False
+            # TODO: language→country inference is a naive prefix match
+            # (longest tag wins).  A better approach would use a proper
+            # locale→territory mapping (e.g. BCP-47 / CLDR supplemental
+            # data) that can handle bare "en" → US, "zh" → CN, etc.
+            # without relying on coincidental seed-data ordering.
             for lang in fallback_languages:
                 country = self._user_repo.get_country_by_language(lang)
                 if country:

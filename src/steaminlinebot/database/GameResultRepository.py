@@ -4,11 +4,10 @@ import time
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from steaminlinebot.game.GameResult import GameResult
-from steaminlinebot.user import Money
+from steaminlinebot.game.GameResultV2 import ScrapedSteamGame
+from steaminlinebot.game.ProtonDBReportV2 import ProtonDBTier
 from steaminlinebot.integration.ProtonDBClient import (
     ScrapedProtonDBReport,
-    ProtonDBTier,
 )
 
 
@@ -16,19 +15,19 @@ class IGameResultRepository(ABC):
     """Data access for cached game results and ProtonDB reports."""
 
     @abstractmethod
-    def insert_game_result(self, game: GameResult) -> int: ...
+    def insert_game_result(self, game: ScrapedSteamGame) -> int: ...
 
     @abstractmethod
-    def get_game_result(self, gameresult_id: int) -> Optional[GameResult]: ...
+    def get_game_result(self, gameresult_id: int) -> Optional[ScrapedSteamGame]: ...
 
 
 class GameResultRepository(IGameResultRepository):
     def __init__(self, db: sqlite3.Connection):
         self.db = db
 
-    def insert_game_result(self, game: GameResult) -> int:
+    def insert_game_result(self, game: ScrapedSteamGame) -> int:
         """
-        Inserts a GameResult and optional ProtonDBReport.
+        Inserts a ScrapedSteamGame and optional ProtonDBReport.
         Returns the gameresults.id
         """
         with self.db:
@@ -42,11 +41,11 @@ class GameResultRepository(IGameResultRepository):
                 (
                     game.appid,
                     game.link,
-                    game.price.value_minor if game.price else None,
+                    game.cost.value_minor if game.cost else None,
                     int(game.is_free),
-                    game.discount,
+                    game.cost.discount if game.cost else None,
                     int(time.time()),
-                    game.country,
+                    game.cost.country_l2 if game.cost else None,
                 ),
             )
 
@@ -85,11 +84,11 @@ class GameResultRepository(IGameResultRepository):
             ),
         )
 
-    def get_game_result(self, gameresult_id: int) -> Optional[GameResult]:
+    def get_game_result(self, gameresult_id: int) -> Optional[ScrapedSteamGame]:
         row = self.db.execute(
             """
             SELECT
-                g.id, g.appid, g.link, g.price_minor, g.is_free, g.discount, g.date,g.country,
+                g.id, g.appid, g.link, g.price_minor, g.is_free, g.discount, g.date, g.country,
                 p.bestReportedTier, p.confidence, p.score, p.tier, p.total, p.trendingTier, c.currency
             FROM gameresults g
             LEFT JOIN protondbresults p ON p.id = g.id
@@ -131,17 +130,23 @@ class GameResultRepository(IGameResultRepository):
                 trending_tier=ProtonDBTier(int(trending_tier)),
             )
 
-        price = Money.Money(
-            country=country, currency3l=currency, value_minor=price_minor
-        )
+        cost = None
+        if price_minor is not None and currency:
+            from steaminlinebot.game.GameResultV2 import ScrapedCost
 
-        return GameResult(
+            cost = ScrapedCost(
+                value_minor=price_minor,
+                currency_3l=currency,
+                full_value_minor=price_minor,  # approximated, not stored separately
+                discount=discount or 0,
+                country_l2=country or "",
+            )
+
+        return ScrapedSteamGame(
             appid=appid,
             link=link,
-            title="",  # fill if you add it to DB later
-            price=price,
+            title="",  # not stored in DB yet
+            cost=cost,
             is_free=bool(is_free),
-            discount=discount,
             proton_db_report=report,
-            country=country,
         )

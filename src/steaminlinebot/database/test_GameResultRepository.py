@@ -2,9 +2,9 @@ from unittest.mock import MagicMock, patch
 
 from steaminlinebot.database.GameResultRepository import GameResultRepository
 from steaminlinebot.game.GameResult import GameResult
+from steaminlinebot.game.ProtonDBReportV2 import ProtonDBTier
 from steaminlinebot.integration.ProtonDBClient import (
     ScrapedProtonDBReport,
-    ProtonDBTier,
 )
 from steaminlinebot.user.Money import Money
 

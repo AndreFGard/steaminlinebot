@@ -24,7 +24,7 @@ class CostData(pydantic.BaseModel):
     full_value_minor: int
     """Represented as 4 decimals (99.99 -> 9999)"""
     discount: int
-    country_l2: str
+    country_l2: Optional[str]
     price_expires_at: Optional[datetime.datetime]
     observed_date: Optional[datetime.datetime]
     """If the current price is a historical low or not"""
@@ -36,7 +36,7 @@ class GameSourceInfo(pydantic.BaseModel):
 
     source_name: str
     external_id: str
-    itad_shop_id: str
+    itad_shop_id: Optional[str]
 
 
 class LowestPriceInPeriod(enum.Enum):
@@ -54,7 +54,7 @@ class HistoricPriceOverview:
 
 
 class ScrapedCost(pydantic.BaseModel):
-    """Cost data from scraping, without DB-only fields."""
+    """Cost data from scraping"""
 
     value_minor: int
     currency_3l: str
@@ -63,8 +63,9 @@ class ScrapedCost(pydantic.BaseModel):
     country_l2: str
 
 
+# TODO does not belong here.
 class ScrapedSteamGame(pydantic.BaseModel):
-    """Steam scraping result, before database insertion."""
+    """Steam scraping result"""
 
     link: str
     title: str
@@ -83,7 +84,7 @@ class GameResultV2(pydantic.BaseModel):
     product_type: Literal[
         "game", "application", "tool", "demo", "dlc", "music", "mod"
     ] = "game"
-    cost: CostData
+    cost: Optional[CostData]
     url: str
     game_source: GameSourceInfo
     """Only exists for steam games"""
