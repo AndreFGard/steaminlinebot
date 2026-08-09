@@ -2,10 +2,11 @@
 
 import json
 import logging
+import sqlite3
 from pathlib import Path
 from typing import Callable
 
-from sqlalchemy import Engine, create_engine, text
+from sqlalchemy import Engine, create_engine, event, text
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from steaminlinebot.database.schema import country_table, game_source_table, metadata
@@ -76,6 +77,13 @@ MIGRATIONS: list[tuple[int, str, Callable[[Engine], None] | str]] = [
         _migration_001_seed_game_sources,
     ),
 ]
+
+
+@event.listens_for(Engine, "connect")
+def _enable_sqlite_fk(dbapi_connection, _connection_record):
+    """Enable foreign key enforcement on every new SQLite connection."""
+    if isinstance(dbapi_connection, sqlite3.Connection):
+        dbapi_connection.execute("PRAGMA foreign_keys = ON")
 
 
 def init_db(database_url: str) -> Engine:
