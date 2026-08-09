@@ -31,27 +31,6 @@ class ISteamClient(ABC):
     @abstractmethod
     async def scrape_game_results(self, query: str, country: str) -> ScrapeResult: ...
 
-
-def _parse_discount(price_str, discount_value: int):
-    """Parses discounts in different locales"""
-    e = Exception()
-    for valueidx in [0, 1]:
-        try:
-            if float(price_str.split()[valueidx].replace(",", ".")) == 0.0:
-                return None
-            else:
-                if float(discount_value) == 0.0:
-                    return None
-                discount = f"-{discount_value:.0f}%"
-                return discount
-        except Exception as ee:
-            e = ee
-    logging.warning(
-        f"Price parsing of price/discount: ('{price_str}','{discount_value}') error: {e}"
-    )
-    return None
-
-
 def _make_game_result(
     game_details: dict,
     proton_db_report: Optional[ScrapedProtonDBReport] = None,

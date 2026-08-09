@@ -15,11 +15,11 @@ from steaminlinebot.database.schema import (
 )
 from steaminlinebot.game.GameResult import (
     CostData,
-    GameResultV2,
+    GameResult,
     GameSourceInfo,
     ScrapedSteamGame,
 )
-from steaminlinebot.game.ProtonDBReportV2 import ProtonDBReportV2, ProtonDBTier
+from steaminlinebot.game.ProtonDBReport import ProtonDBReport, ProtonDBTier
 from steaminlinebot.integration.ProtonDBClient import ScrapedProtonDBReport
 
 log = logging.getLogger(__name__)
@@ -30,24 +30,10 @@ class SourceNotFoundError(LookupError):
 
 
 class IGameResultRepository(ABC):
-    """Persists scraped game data and returns a fully-hydrated GameResultV2.
-
-    Args:
-        game: The scraped game to persist.
-        source_name: Name of the store source (e.g. ``"Steam"``). Must exist
-            in the ``game_source`` table.
-
-    Returns:
-        GameResultV2 with all database-generated IDs populated.
-
-    Raises:
-        SourceNotFoundError: If *source_name* is not found in ``game_source``.
-    """
-
     @abstractmethod
     def insert_game_result(
         self, game: ScrapedSteamGame, source_name: str
-    ) -> GameResultV2: ...
+    ) -> GameResult: ...
 
 
 class GameResultRepository(IGameResultRepository):
@@ -56,14 +42,14 @@ class GameResultRepository(IGameResultRepository):
 
     def insert_game_result(
         self, game: ScrapedSteamGame, source_name: str
-    ) -> GameResultV2:
+    ) -> GameResult:
         with self._engine.begin() as conn:
             source = _get_source(conn, source_name)
             game_id = _get_or_insert_game(conn, game, source.id, game.appid)
             cost_data = _insert_cost(conn, game_id, source.id, game)
             proton_db_info = _insert_proton_report(conn, game_id, game.proton_db_report)
 
-            return GameResultV2(
+            return GameResult(
                 id=game_id,
                 title=game.title,
                 product_type=game.product_type,
@@ -167,7 +153,7 @@ def _insert_proton_report(
     conn: Connection,
     game_id: int,
     report: ScrapedProtonDBReport | None,
-) -> ProtonDBReportV2 | None:
+) -> ProtonDBReport | None:
     if report is None:
         return None
 
@@ -185,7 +171,7 @@ def _insert_proton_report(
         )
     )
 
-    return ProtonDBReportV2(
+    return ProtonDBReport(
         game_id=game_id,
         best_reported_tier=ProtonDBTier(report.best_reported_tier),
         confidence=report.confidence,

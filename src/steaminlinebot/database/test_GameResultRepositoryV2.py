@@ -9,11 +9,11 @@ from steaminlinebot.database.GameResultRepository import (
 from steaminlinebot.game.GameResult import (
     ScrapedSteamGame,
     ScrapedCost,
-    GameResultV2,
+    GameResult,
     CostData,
     GameSourceInfo,
 )
-from steaminlinebot.game.ProtonDBReportV2 import ProtonDBReportV2, ProtonDBTier
+from steaminlinebot.game.ProtonDBReport import ProtonDBReport, ProtonDBTier
 from steaminlinebot.integration.ProtonDBClient import ScrapedProtonDBReport
 
 
@@ -134,7 +134,7 @@ class TestInsertFullGame:
             source_name="Steam",
         )
 
-        expected = GameResultV2(
+        expected = GameResult(
             id=0,  # stripped
             title="Counter-Strike",
             product_type="game",
@@ -155,7 +155,7 @@ class TestInsertFullGame:
                 external_id="730",
                 itad_shop_id="61",
             ),
-            proton_db_info=ProtonDBReportV2(
+            proton_db_info=ProtonDBReport(
                 game_id=0,
                 best_reported_tier=ProtonDBTier.GOLD,
                 confidence="Strong",

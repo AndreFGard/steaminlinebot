@@ -5,7 +5,7 @@ from typing import Literal, Optional
 
 import pydantic
 
-from steaminlinebot.game.ProtonDBReportV2 import ProtonDBReportV2
+from steaminlinebot.game.ProtonDBReport import ProtonDBReport
 from steaminlinebot.integration.ProtonDBClient import ScrapedProtonDBReport
 
 
@@ -45,6 +45,7 @@ class LowestPriceInPeriod(enum.Enum):
     QUARTER = "m3"
 
 
+# TODO: this class is in the DB, but not yet wired in.
 class HistoricPriceOverview:
     game_id: int
     scope: LowestPriceInPeriod
@@ -78,7 +79,7 @@ class ScrapedSteamGame(pydantic.BaseModel):
     ] = "game"
 
 
-class GameResultV2(pydantic.BaseModel):
+class GameResult(pydantic.BaseModel):
     id: int
     title: str
     product_type: Literal[
@@ -88,4 +89,4 @@ class GameResultV2(pydantic.BaseModel):
     url: str
     game_source: GameSourceInfo
     """Only exists for steam games"""
-    proton_db_info: Optional[ProtonDBReportV2]
+    proton_db_info: Optional[ProtonDBReport]

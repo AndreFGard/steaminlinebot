@@ -7,7 +7,7 @@ from typing import Optional
 from steaminlinebot.database.GameResultRepository import IGameResultRepository
 from steaminlinebot.game import GameResult
 from steaminlinebot.game.GameResult import ScrapedSteamGame
-from steaminlinebot.game.ProtonDBReportV2 import ProtonDBTier
+from steaminlinebot.game.ProtonDBReport import ProtonDBTier
 from steaminlinebot.integration.SteamClient import ISteamClient
 
 
@@ -34,7 +34,7 @@ class GameResultVM:
 
 
 # TODO this does not belong here as it's not steam specific
-def _gameresult_to_gameresultvm(game: GameResult.GameResultV2) -> GameResultVM:
+def _gameresult_to_gameresultvm(game: GameResult.GameResult) -> GameResultVM:
     # TODO see what code will be responsible for price formatting
     price = (
         None
@@ -90,7 +90,7 @@ class SteamProvider(ISearchGames):
         self._game_result_repo = game_result_repo
         self._client = client
 
-    def _insert_scraped_game(self, game: ScrapedSteamGame) -> GameResult.GameResultV2:
+    def _insert_scraped_game(self, game: ScrapedSteamGame) -> GameResult.GameResult:
         return self._game_result_repo.insert_game_result(game, "Steam")
 
     async def search_game(

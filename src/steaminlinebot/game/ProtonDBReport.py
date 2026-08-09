@@ -30,7 +30,7 @@ class ProtonDBTier(IntEnum):
         return cls(tier)
 
 
-class ProtonDBReportV2(pydantic.BaseModel):
+class ProtonDBReport(pydantic.BaseModel):
     game_id: int
     best_reported_tier: ProtonDBTier
     confidence: str
