@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Optional
 
 from steaminlinebot.game.SteamProvider import ISearchGames, SearchResults
 from steaminlinebot.user.UserCountry import CountryConfig, IUserCountry
@@ -15,7 +16,7 @@ class GameSearchResult:
 
 class IGameSearchUsecase:
     async def handle_game_search(
-        self, query: str, user_id: int, language_code: str
+        self, query: str, user_id: int, user_lang_etf: Optional[str]
     ) -> GameSearchResult: ...
 
 
@@ -24,23 +25,20 @@ class GameSearchUsecase(IGameSearchUsecase):
         self,
         user_country: IUserCountry,
         search_games: ISearchGames,
-        default_country_code: str,
     ):
         self.user_country = user_country
         self.search_games = search_games
-        self.default_country_code = default_country_code
 
     async def handle_game_search(
-        self, query: str, user_id: int, language_code: str
+        self, query: str, user_id: int, user_lang_etf: Optional[str]
     ) -> GameSearchResult:
         if len(query) < 3:
             raise QueryTooShortError(str(query))
 
-        fallback_languages = [language_code, "en-us"]
-        country_config = self.user_country.get_country(user_id, fallback_languages)
+        country_config = await self.user_country.resolve_country(user_id, user_lang_etf)
 
         search_results = await self.search_games.search_game(
-            query, country_code=country_config.country or self.default_country_code
+            query, country_code=country_config.country
         )
 
         return GameSearchResult(

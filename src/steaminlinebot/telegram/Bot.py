@@ -34,16 +34,13 @@ class Bot:
         logging.warning(update)
         start = time.time()
 
-        user_lang = update.inline_query.from_user.language_code
-        if not user_lang:
-            suggested_langs = await self._user_country.suggest_currencies("")
-            user_lang = suggested_langs.alternative_suggestions[0]
+        user_lang_etf = update.inline_query.from_user.language_code
 
         try:
             game_search_result = await self._game_searcher.handle_game_search(
                 query=update.inline_query.query,
                 user_id=update.inline_query.from_user.id,
-                language_code=user_lang,
+                user_lang_etf=user_lang_etf,
             )
             presentation = self._presenter.make_inline_query_presentation(
                 game_search_result
@@ -82,17 +79,14 @@ class Bot:
         assert message and message.from_user
         user_id = message.from_user.id
 
-        if context.args:
-            country_mod = await self._user_country.set_country(
-                user_id,
-                user_lang_etf=message.from_user.language_code,
-                requested_country=context.args[0],
-            )
-        else:
-            country_mod = await self._user_country.suggest_currencies(
-                message.from_user.language_code or "en"
-            )
-        presentation = self._presenter.make_currency_message_from_country(country_mod)
+        result = await self._user_country.set_country(
+            user_id,
+            requested_country=context.args[0] if context.args else "",
+            user_lang_2l=message.from_user.language_code,
+        )
+        presentation = self._presenter.make_currency_message_from_country(
+            result.modification, result.suggestions
+        )
 
         await message.reply_text(
             presentation.text,
@@ -131,15 +125,17 @@ class Bot:
 
         assert query.data
         user_id = query.from_user.id
-        user_lang = query.from_user.language_code
 
         country = ""
         if len(query.data.split()) == 2:
             country = query.data.split(" ")[1]
 
-        country_mod = await self._user_country.set_country(user_id, country, user_lang)
-
-        presentation = self._presenter.make_currency_message_from_country(country_mod)
+        result = await self._user_country.set_country(
+            user_id, country, query.from_user.language_code
+        )
+        presentation = self._presenter.make_currency_message_from_country(
+            result.modification, result.suggestions
+        )
 
         await query.edit_message_text(
             presentation.text, parse_mode=presentation.parse_mode

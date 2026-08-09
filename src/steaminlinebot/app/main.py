@@ -92,7 +92,6 @@ def main():
     game_searcher = GameSearchUsecase(
         user_country=user_country,
         search_games=search_games,
-        default_country_code="US",
     )
 
     bot = Bot(

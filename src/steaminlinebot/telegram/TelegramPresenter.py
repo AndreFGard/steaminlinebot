@@ -26,34 +26,6 @@ class SpecialResults(Enum):
     QUERY_TOO_SHORT = 4
 
 
-class ITelegramPresenter(ABC):
-    """Builds Telegram API objects from domain view models.
-
-    This is the inversion boundary: domain/services speak in view models,
-    the presenter translates them into Telegram API objects.
-    Mock this interface to test handlers without Telegram API objects.
-    """
-
-    @abstractmethod
-    def make_inline_query_presentation(
-        self,
-        result: GameSearchResult,
-    ) -> "TelegramInlineResultListPres": ...
-
-    @abstractmethod
-    def make_error_presentation(
-        self, error: "SpecialResults"
-    ) -> "TelegramInlineResultListPres": ...
-
-    @abstractmethod
-    def make_delete_confirmation(self, success: bool) -> "TelegramPresentation": ...
-
-    @abstractmethod
-    def make_currency_message_from_country(
-        self, country_mod: CountryModification
-    ) -> "TelegramCountryPres": ...
-
-
 @dataclass
 class TelegramPresentation:
     keyboard: InlineKeyboardMarkup
@@ -78,6 +50,35 @@ class TelegramCountryPres(TelegramPresentation): ...
 class TelegramInlineResultListPres:
     results: list[InlineQueryResultArticle]
     button: Optional[InlineQueryResultsButton]
+
+
+class ITelegramPresenter(ABC):
+    """Builds Telegram API objects from domain view models.
+
+    This is the inversion boundary: domain/services speak in view models,
+    the presenter translates them into Telegram API objects.
+    Mock this interface to test handlers without Telegram API objects.
+    """
+
+    @abstractmethod
+    def make_inline_query_presentation(
+        self,
+        result: GameSearchResult,
+    ) -> "TelegramInlineResultListPres": ...
+
+    @abstractmethod
+    def make_error_presentation(
+        self, error: "SpecialResults"
+    ) -> "TelegramInlineResultListPres": ...
+
+    @abstractmethod
+    def make_delete_confirmation(self, success: bool) -> "TelegramPresentation": ...
+
+    def make_currency_message_from_country(
+        self,
+        country_mod: Optional[CountryModification],
+        alternative_suggestions: list[str],
+    ) -> TelegramCountryPres: ...
 
 
 def MakeSetCurrencyCallback(country_code: str) -> str:
@@ -225,9 +226,12 @@ class TelegramPresenter(ITelegramPresenter):
         return InlineKeyboardMarkup(keyboard)
 
     def make_currency_message_from_country(
-        self, country_mod: CountryModification
+        self,
+        country_mod: Optional[CountryModification],
+        alternative_suggestions: list[str],
     ) -> TelegramCountryPres:
-        if country_mod.configured_country or country_mod.requested_country:
+
+        if country_mod:
             if country_mod.configured_country:
                 text = (
                     f"Your currency has been set to {country_mod.configured_country}✅"
@@ -238,14 +242,14 @@ class TelegramPresenter(ITelegramPresenter):
                     f"Could not set currency to *{country_mod.requested_country}*. Is it a valid country code?"
                     "\nPerhaps you meant one of those:"
                 )
-                kb = self._make_country_keyboard(country_mod.alternative_suggestions)
+                kb = self._make_country_keyboard(alternative_suggestions)
         else:
             text = (
                 "**How to set your currency:**\n"
                 "Use `/setcurrency CODE` (e.g., `/setcurrency US`).\n\n"
                 "Select one of the popular options below:"
             )
-            kb = self._make_country_keyboard(country_mod.alternative_suggestions)
+            kb = self._make_country_keyboard(alternative_suggestions)
 
         return TelegramCountryPres(text=text, keyboard=kb, parse_mode="Markdown")
 
