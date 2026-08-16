@@ -29,7 +29,7 @@ from steaminlinebot.database import init_db
 from steaminlinebot.integration.ProtonDBClient import ProtonDBClient
 from steaminlinebot.game.GameSearchUsecase import GameSearchUsecase
 from steaminlinebot.game.SteamProvider import SteamProvider
-from steaminlinebot.integration.SteamClient import SteamClient, SteamRequestMaker
+from steaminlinebot.integration.SteamClient import SteamClient
 from steaminlinebot.user.UserCountry import UserCountry
 
 logLevel = {""}
@@ -78,7 +78,6 @@ def main():
 
     steam_client = SteamClient(
         max_results=6,
-        steam_request_maker=SteamRequestMaker(),
         protondb_client=protondb_client,
     )
 

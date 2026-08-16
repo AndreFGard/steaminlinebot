@@ -31,6 +31,7 @@ class ISteamClient(ABC):
     @abstractmethod
     async def scrape_game_results(self, query: str, country: str) -> ScrapeResult: ...
 
+
 def _make_game_result(
     game_details: dict,
     proton_db_report: Optional[ScrapedProtonDBReport] = None,
@@ -79,19 +80,56 @@ def _make_game_result(
         return None
 
 
-class ISteamRequestMaker:
-    async def get_many_game_details(self, appids, country) -> list[dict]: ...
+def _parse_many_appids(search_game_html_results: list[BeautifulSoup]) -> dict[str, None]:
+    "Parses html and returns dict of every appid found in the search for each given game name. empty keys (for now)"
 
-    async def search_many_games_html(
-        self, game_names: Iterable[str], country
-    ) -> list[BeautifulSoup]: ...
+    appids = {}
+    for soup in search_game_html_results:
+        for game in soup.find_all("a"):
+            if game.has_attr("data-ds-appid"):
+                appids[game["data-ds-appid"]] = None
+    return appids
 
 
-class SteamRequestMaker(ISteamRequestMaker):
+class SteamClient(ISteamClient):
     _GAME_SEARCH_URL = "https://store.steampowered.com/search/suggest"
     _API_APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails"
 
-    async def search_many_games_html(
+    def __init__(
+        self,
+        max_results: int,
+        protondb_client: IProtonDBClient | None = None,
+    ):
+        self.max_results = max_results
+        self._protondb = protondb_client or ProtonDBClient()
+
+    async def scrape_game_results(self, query: str, country: str) -> ScrapeResult:
+        """gets game details for each appid found in the search for the given
+        query(game name) and makes ScrapedGame obj from each of those and returns a list of them all
+        """
+        responses = await self._search_many_games_html([query], country)
+        appids = list(_parse_many_appids(responses).keys())[: self.max_results]
+
+        game_details, protondbs = await asyncio.gather(
+            self._get_many_game_details(appids, country),
+            self._protondb.get_reports(appids),
+        )
+        # hopefully, their order is the same
+
+        raw_results = [
+            _make_game_result(
+                game_detail,
+                proton_db_report=protondb,
+                country=country,
+            )
+            for game_detail, protondb in zip(game_details, protondbs)
+        ]
+        return ScrapeResult(
+            (None in raw_results),
+            [result for result in raw_results if result is not None],
+        )
+
+    async def _search_many_games_html(
         self, game_names: Iterable[str], country
     ) -> list[BeautifulSoup]:
         async with aiohttp.ClientSession() as session:
@@ -135,7 +173,7 @@ class SteamRequestMaker(ISteamRequestMaker):
             return await r.json()
 
     # we need this only to get discount data, as _get_game_suggestions doesnt have it
-    async def get_many_game_details(self, appids, country):
+    async def _get_many_game_details(self, appids, country) -> list[dict]:
         async with aiohttp.ClientSession() as session:
             """gets game details for each given appid and returns list with every response's json"""
             tasks = [
@@ -146,54 +184,3 @@ class SteamRequestMaker(ISteamRequestMaker):
             ]
             results = await asyncio.gather(*tasks)
             return results
-
-
-def parse_many_appids(search_game_html_results: list[BeautifulSoup]):
-    "analyzes html and returns dict of every appid found in the search for each given game name. empty keys (for now)"
-
-    appids = {}
-    for soup in search_game_html_results:
-        for game in soup.find_all("a"):
-            if game.has_attr("data-ds-appid"):
-                appids[game["data-ds-appid"]] = ""
-    return appids
-
-
-class SteamClient(ISteamClient):
-    def __init__(
-        self,
-        max_results: int,
-        steam_request_maker: SteamRequestMaker,
-        protondb_client: IProtonDBClient | None = None,
-    ):
-        self.max_results = max_results
-        self._protondb = protondb_client or ProtonDBClient()
-        self._steam_request_maker = steam_request_maker
-
-    async def scrape_game_results(self, query: str, country: str) -> ScrapeResult:
-        """gets game details for each appid found in the search for the given
-        query(game name) and makes ScrapedGame obj from each of those and returns a list of them all
-        """
-        responses = await self._steam_request_maker.search_many_games_html(
-            [query], country
-        )
-        appids = list(parse_many_appids(responses).keys())
-
-        game_details, protondbs = await asyncio.gather(
-            self._steam_request_maker.get_many_game_details(appids, country),
-            self._protondb.get_reports(appids),
-        )
-        # hopefully, their order is the same
-
-        raw_results = [
-            _make_game_result(
-                game_detail,
-                proton_db_report=protondb,
-                country=country,
-            )
-            for game_detail, protondb in zip(game_details, protondbs)
-        ]
-        return ScrapeResult(
-            (None in raw_results),
-            [result for result in raw_results if result is not None],
-        )

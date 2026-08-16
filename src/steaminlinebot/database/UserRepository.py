@@ -85,7 +85,7 @@ class UserRepository(IUserRepository):
             ).first()
         return row.country_alpha2 if row is not None else None
 
-    #TODO: test does not allow inserting none xistant country
+    # TODO: test does not allow inserting none xistant country
     def upsert_user_country(self, user_id: int, country_code: str) -> bool:
         """Insert or update the country preference for *user_id* (Telegram ID).
 
