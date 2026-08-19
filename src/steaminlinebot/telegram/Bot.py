@@ -46,10 +46,8 @@ class Bot:
                 game_search_result
             )
             end_time = time.time()
-            logging.info(f"RESULTS : {game_search_result.search_results.results}")
-            logging.info(
-                f"Scrape time: {game_search_result.search_results.scrape_time:.4f}s, total_time: {(end_time - start):.4f}s"
-            )
+            logging.info(f"RESULTS : {game_search_result.search_results}")
+            logging.info(f"Total_time: {(end_time - start):.4f}s")
         except QueryTooShortError:
             presentation = self._presenter.make_error_presentation(
                 SpecialResults.QUERY_TOO_SHORT
@@ -113,7 +111,9 @@ class Bot:
 
             # todo: handle errors here
             return await asyncio.gather(
-                self._callback_handlers[key](update, context), query.answer()
+                self._callback_handlers[key](update, context),
+                query.answer(),
+                return_exceptions=False,
             )
 
     async def _handle_currency_callback(

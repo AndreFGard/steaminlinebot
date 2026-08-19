@@ -12,8 +12,9 @@ from telegram import (
     InputTextMessageContent,
 )
 
+from steaminlinebot.game import GameResult
 from steaminlinebot.game.GameSearchUsecase import GameSearchResult
-from steaminlinebot.game.SteamProvider import (
+from steaminlinebot.game.GameSearcher import (
     GameResultVM,
     ProtonDBVM,
 )
@@ -83,6 +84,36 @@ class ITelegramPresenter(ABC):
 
 def MakeSetCurrencyCallback(country_code: str) -> str:
     return f"setcurrency {country_code}"
+
+
+def _gameresult_to_gameresultvm(game: GameResult.GameResult) -> GameResultVM:
+    # TODO see what code will be responsible for price formatting
+    price = (
+        None
+        if not game.cost
+        else f"{game.cost.value_minor} {game.cost.currency_3l} ({game.cost.country_l2})"
+    )
+
+    if game.proton_db_info:
+        proton_vm = ProtonDBVM(
+            tier=game.proton_db_info.tier,
+            positive_trend=False,
+            total_reports=game.proton_db_info.total,
+            appid=game.game_source.external_id,
+        )
+    else:
+        proton_vm = None
+
+    return GameResultVM(
+        id=game.id,
+        link=game.url,
+        title=game.title,
+        appid=game.game_source.external_id,
+        price=price,
+        is_free=game.cost.full_value_minor == 0 if game.cost else False,
+        discount=game.cost.discount if game.cost else None,
+        proton_db=proton_vm,
+    )
 
 
 class TelegramPresenter(ITelegramPresenter):
@@ -174,10 +205,14 @@ class TelegramPresenter(ITelegramPresenter):
         self,
         result: GameSearchResult,
     ) -> TelegramInlineResultListPres:
-        articles = [
-            self._make_inline_game_article(game, result.country_config).query_article
-            for game in result.search_results.results
-        ]
+        articles = []
+        for game in result.search_results:
+            game_vm = _gameresult_to_gameresultvm(game)
+            article = self._make_inline_game_article(
+                game_vm, result.country_config
+            ).query_article
+            articles.append(article)
+
         if not articles:
             articles.append(
                 self._make_special_inline_query_result(SpecialResults.NO_MATCHES)

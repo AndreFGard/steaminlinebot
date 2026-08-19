@@ -5,12 +5,15 @@
 @Steaminlinebot written by Andrefgard on github
 """
 
+import asyncio
 import logging
 import os
+import signal
 import sys
 from logging import DEBUG, INFO, WARNING, basicConfig
 
 
+import aiohttp
 from telegram import (
     Update,
 )
@@ -28,7 +31,7 @@ from steaminlinebot.telegram.TelegramPresenter import TelegramPresenter
 from steaminlinebot.database import init_db
 from steaminlinebot.integration.ProtonDBClient import ProtonDBClient
 from steaminlinebot.game.GameSearchUsecase import GameSearchUsecase
-from steaminlinebot.game.SteamProvider import SteamProvider
+from steaminlinebot.game.GameSearcher import GameSearchService, IGameSearcher
 from steaminlinebot.integration.SteamClient import SteamClient
 from steaminlinebot.user.UserCountry import UserCountry
 
@@ -64,7 +67,7 @@ async def error(update: Update, context):
     print(f"Update {update} caused error {context.error}")
 
 
-def main():
+async def main():
     try:
         token = os.environ["BOT_TOKEN"]
     except KeyError:
@@ -76,44 +79,63 @@ def main():
     game_result_repo = GameResultRepository(db)
     protondb_client = ProtonDBClient()
 
-    steam_client = SteamClient(
-        max_results=6,
-        protondb_client=protondb_client,
-    )
+    async with aiohttp.ClientSession() as session:
+        steam_client = SteamClient(
+            session,
+            protondb_client=protondb_client,
+        )
 
-    user_repo = UserRepository(db)
-    user_country = UserCountry(user_repo=user_repo)
-    search_games = SteamProvider(
-        client=steam_client,
-        game_result_repo=game_result_repo,
-    )
-    presenter = TelegramPresenter()
-    game_searcher = GameSearchUsecase(
-        user_country=user_country,
-        search_games=search_games,
-    )
+        user_repo = UserRepository(db)
+        user_country = UserCountry(user_repo=user_repo)
+        search_games = GameSearchService(
+            client=steam_client,
+            game_result_repo=game_result_repo,
+        )
+        presenter = TelegramPresenter()
+        game_searcher = GameSearchUsecase(
+            user_country=user_country,
+            search_games=search_games,
+        )
 
-    bot = Bot(
-        user_country=user_country,
-        presenter=presenter,
-        game_searcher=game_searcher,
-    )
+        bot = Bot(
+            user_country=user_country,
+            presenter=presenter,
+            game_searcher=game_searcher,
+        )
 
-    application = Application.builder().token(token).build()
+        application = Application.builder().token(token).build()
 
-    application.add_handler(CommandHandler("start", help))
-    application.add_handler(CommandHandler("help", help))
+        application.add_handler(CommandHandler("start", help))
+        application.add_handler(CommandHandler("help", help))
 
-    application.add_handler(InlineQueryHandler(bot.handle_inline_query))
+        application.add_handler(InlineQueryHandler(bot.handle_inline_query))
 
-    application.add_handler(CommandHandler("setcurrency", bot.set_currency))
-    application.add_handler(CommandHandler("deleteinfo", bot.delete_user_info))
-    application.add_handler(CallbackQueryHandler(bot.callback_handler))
+        application.add_handler(CommandHandler("setcurrency", bot.set_currency))
+        application.add_handler(CommandHandler("deleteinfo", bot.delete_user_info))
+        application.add_handler(CallbackQueryHandler(bot.callback_handler))
 
-    application.add_error_handler(error)  # type: ignore
+        application.add_error_handler(error)  # type: ignore
 
-    application.run_polling()
+        # run_polling() is synchronous and manages its own event loop, so it can't be
+        # called from inside an already-running loop. Use the async API instead.
+        async with application:
+            assert application.updater
+            await application.updater.start_polling()
+            await application.start()
+
+            stop_event = asyncio.Event()
+            loop = asyncio.get_running_loop()
+            for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGABRT):
+                try:
+                    loop.add_signal_handler(sig, stop_event.set)
+                except NotImplementedError:
+                    pass
+
+            await stop_event.wait()
+
+            await application.updater.stop()
+            await application.stop()
 
 
-if __name__ == "__main__":
-    main()
+def run():
+    asyncio.run(main())

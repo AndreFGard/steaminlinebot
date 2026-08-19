@@ -33,55 +33,18 @@ class GameResultVM:
     proton_db: Optional[ProtonDBVM]
 
 
-# TODO this does not belong here as it's not steam specific
-def _gameresult_to_gameresultvm(game: GameResult.GameResult) -> GameResultVM:
-    # TODO see what code will be responsible for price formatting
-    price = (
-        None
-        if not game.cost
-        else f"{game.cost.value_minor} {game.cost.currency_3l} ({game.cost.country_l2})"
-    )
-
-    if game.proton_db_info:
-        proton_vm = ProtonDBVM(
-            tier=game.proton_db_info.tier,
-            positive_trend=False,
-            total_reports=game.proton_db_info.total,
-            appid=game.game_source.external_id,
-        )
-    else:
-        proton_vm = None
-
-    return GameResultVM(
-        id=game.id,
-        link=game.url,
-        title=game.title,
-        appid=game.game_source.external_id,
-        price=price,
-        is_free=game.cost.full_value_minor == 0 if game.cost else False,
-        discount=game.cost.discount if game.cost else None,
-        proton_db=proton_vm,
-    )
-
-
-class ISearchGames(ABC):
-    """Orchestrates game search: Steam scraping + ProtonDB + persistence."""
+class IGameSearcher(ABC):
+    """Searches game ids from a platform/store"""
 
     @abstractmethod
     async def search_game(
         self,
         query: str,
         country_code: str,
-    ) -> SearchResults: ...
+    ) -> list[GameResult.GameResult]: ...
 
 
-@dataclass
-class SearchResults:
-    results: list[GameResultVM]
-    scrape_time: float
-
-
-class SteamProvider(ISearchGames):
+class GameSearchService(IGameSearcher):
     def __init__(
         self,
         client: ISteamClient,
@@ -98,21 +61,19 @@ class SteamProvider(ISearchGames):
         query: str,
         country_code: str,
     ):
-        results: list[GameResultVM] = []
-
-        start = time.time()
-        res = await self._client.scrape_game_results(query, country_code)
-        end = time.time()
+        results: list[GameResult.GameResult] = []
+        appids = await self._client.search_game_title(query, country_code)
+        res = await self._client.scrape_game_results(appids, country_code)
 
         for game in res.results:
             if game.product_type not in self._DESIRED_PRODUCT_TYPES:
                 continue
             try:
-                game_vm = _gameresult_to_gameresultvm(self._insert_scraped_game(game))
-                results.append(game_vm)
+                game_result = self._insert_scraped_game(game)
+                results.append(game_result)
             except Exception as e:
                 logging.info(f"Error at search_game when building Result: {e}")
 
-        return SearchResults(results, end - start)
+        return results
 
     _DESIRED_PRODUCT_TYPES = set(["game", "dlc"])

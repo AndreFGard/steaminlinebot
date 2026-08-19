@@ -1,12 +1,13 @@
 import asyncio
 import logging
 from abc import ABC, abstractmethod
-from typing import Iterable, Optional, Union
+from typing import Optional, Union
 from urllib.parse import urlencode
 
 import aiohttp
 from attr import dataclass
 from bs4 import BeautifulSoup
+import pydantic
 
 from steaminlinebot.game.GameResult import ScrapedCost, ScrapedSteamGame
 from steaminlinebot.integration.ProtonDBClient import IProtonDBClient
@@ -19,6 +20,14 @@ from steaminlinebot.integration.ProtonDBClient import (
 # which can be used to reduce the bot latency.
 
 
+class GameAppid(pydantic.BaseModel):
+    appid: str
+    country_2l: str
+
+    _title: Optional[str]
+    _formatted_price: Optional[str]
+
+
 @dataclass
 class ScrapeResult:
     found_error: Union[bool, Exception]
@@ -29,7 +38,13 @@ class ISteamClient(ABC):
     """Scrapes Steam search results and fetches game details."""
 
     @abstractmethod
-    async def scrape_game_results(self, query: str, country: str) -> ScrapeResult: ...
+    async def search_game_title(
+        self, query: str, country_2l: str
+    ) -> list[GameAppid]: ...
+    @abstractmethod
+    async def scrape_game_results(
+        self, appids: list[GameAppid], country: str
+    ) -> ScrapeResult: ...
 
 
 def _make_game_result(
@@ -80,42 +95,114 @@ def _make_game_result(
         return None
 
 
-def _parse_many_appids(search_game_html_results: list[BeautifulSoup]) -> dict[str, None]:
-    "Parses html and returns dict of every appid found in the search for each given game name. empty keys (for now)"
+_API_APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails"
 
-    appids = {}
-    for soup in search_game_html_results:
-        for game in soup.find_all("a"):
-            if game.has_attr("data-ds-appid"):
-                appids[game["data-ds-appid"]] = None
-    return appids
+
+async def _get_game_details_json(
+    appid, country, session: aiohttp.ClientSession
+) -> dict:
+    """makes steam api details request for given appid and returns future for it's json response"""
+    params = {
+        "appids": appid,
+        "cc": country,
+        "filters": "basic,price_overview",
+    }
+    logging.info(
+        f"Getting game_details json: {_API_APP_DETAILS_URL}?{urlencode(params)}"
+    )
+    # https://store.steampowered.com/api/appdetails?appids=730&cc=US&filters=basic,price_overview
+    async with session.get(_API_APP_DETAILS_URL, params=params) as r:
+        return await r.json()
+
+
+# we need this only to get discount data, as _get_game_suggestions doesnt have it
+async def _get_many_game_details(
+    appids: list[str], country_2l, session: aiohttp.ClientSession
+) -> list[dict]:
+    """gets game details for each given appid and returns list with every response's json"""
+    tasks = [
+        asyncio.create_task(_get_game_details_json(appid, country_2l, session))
+        for appid in appids
+    ]
+    results = await asyncio.gather(*tasks)
+    return results
+
+
+def parse_game_appids_from_suggest_html(
+    suggest_html_data: BeautifulSoup, country_2l: str
+) -> list[GameAppid]:
+
+    games = []
+    for game in suggest_html_data.find_all("a"):
+        if game.has_attr("data-ds-appid"):
+            appid = str(game["data-ds-appid"])
+
+            price = game.find("div", attrs={"class": "match_price"})
+            if price is not None:
+                price = str(price)
+
+            name = game.find("div", attrs={"class": "match_name"})
+            if name is not None:
+                name = str(name)
+
+            games.append(
+                GameAppid(
+                    appid=appid,
+                    _title=name,
+                    _formatted_price=price,
+                    country_2l=country_2l,
+                )
+            )
+    return games
 
 
 class SteamClient(ISteamClient):
-    _GAME_SEARCH_URL = "https://store.steampowered.com/search/suggest"
-    _API_APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails"
-
     def __init__(
         self,
-        max_results: int,
+        session: aiohttp.ClientSession,
         protondb_client: IProtonDBClient | None = None,
     ):
-        self.max_results = max_results
+        self._session = session
         self._protondb = protondb_client or ProtonDBClient()
 
-    async def scrape_game_results(self, query: str, country: str) -> ScrapeResult:
+    async def search_game_title(self, query: str, country_2l: str) -> list[GameAppid]:
+        # This was the endpoint used as you typed in the steam search bar. Now unused by the steam store.
+        _GAME_SEARCH_SUGGEST_URL = "https://store.steampowered.com/search/suggest"
+
+        params = {
+            "term": (query),
+            "f": "games",
+            "cc": country_2l,
+            "realm": 1,
+            "l": "english",
+        }
+        # https://store.steampowered.com/search/suggest?term=counter+strike&f=games&cc=US&realm=1&l=english
+        logging.info(
+            f"Searching games URL: {_GAME_SEARCH_SUGGEST_URL}?{urlencode(params)}"
+        )
+
+        req = self._session.get(_GAME_SEARCH_SUGGEST_URL, params=params)
+        res = await req
+        data = BeautifulSoup(await res.text(), "html.parser")
+
+        appids = parse_game_appids_from_suggest_html(data, country_2l)
+        return appids
+
+    async def scrape_game_results(
+        self, appids: list[GameAppid], country: str
+    ) -> ScrapeResult:
         """gets game details for each appid found in the search for the given
         query(game name) and makes ScrapedGame obj from each of those and returns a list of them all
         """
-        responses = await self._search_many_games_html([query], country)
-        appids = list(_parse_many_appids(responses).keys())[: self.max_results]
 
         game_details, protondbs = await asyncio.gather(
-            self._get_many_game_details(appids, country),
-            self._protondb.get_reports(appids),
+            _get_many_game_details(
+                [game.appid for game in appids], country, self._session
+            ),
+            self._protondb.get_reports([game.appid for game in appids]),
         )
-        # hopefully, their order is the same
 
+        # hopefully, their order is the same
         raw_results = [
             _make_game_result(
                 game_detail,
@@ -128,59 +215,3 @@ class SteamClient(ISteamClient):
             (None in raw_results),
             [result for result in raw_results if result is not None],
         )
-
-    async def _search_many_games_html(
-        self, game_names: Iterable[str], country
-    ) -> list[BeautifulSoup]:
-        async with aiohttp.ClientSession() as session:
-            tasks = []
-            for game_name in game_names:
-                params = {
-                    "term": (game_name),
-                    "f": "games",
-                    "cc": country,
-                    "realm": 1,
-                    "l": "english",
-                }
-                # https://store.steampowered.com/search/suggest?term=counter+strike&f=games&cc=US&realm=1&l=english
-                logging.info(
-                    f"Searching games URL: {self._GAME_SEARCH_URL}?{urlencode(params)}"
-                )
-
-                req = session.get(self._GAME_SEARCH_URL, params=params)
-                tasks.append(req)
-
-            responses = await asyncio.gather(*tasks)
-            return [
-                BeautifulSoup(await response.text(), "html.parser")
-                for response in responses
-            ]
-
-    async def _get_game_details_json(
-        self, appid, country, session: aiohttp.ClientSession
-    ) -> dict:
-        """makes steam api details request for given appid and returns future for it's json response"""
-        params = {
-            "appids": appid,
-            "cc": country,
-            "filters": "basic,price_overview",
-        }
-        logging.info(
-            f"Getting game_details json: {self._API_APP_DETAILS_URL}?{urlencode(params)}"
-        )
-        # https://store.steampowered.com/api/appdetails?appids=730&cc=US&filters=basic,price_overview
-        async with session.get(self._API_APP_DETAILS_URL, params=params) as r:
-            return await r.json()
-
-    # we need this only to get discount data, as _get_game_suggestions doesnt have it
-    async def _get_many_game_details(self, appids, country) -> list[dict]:
-        async with aiohttp.ClientSession() as session:
-            """gets game details for each given appid and returns list with every response's json"""
-            tasks = [
-                asyncio.create_task(
-                    self._get_game_details_json(appid, country, session)
-                )
-                for appid in appids
-            ]
-            results = await asyncio.gather(*tasks)
-            return results
