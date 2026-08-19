@@ -2,19 +2,19 @@ import pytest
 from sqlalchemy import create_engine
 import sqlalchemy
 from steaminlinebot.database.schema import metadata, game_source_table, country_table
-from steaminlinebot.database.GameResultRepository import (
+from steaminlinebot.database.gameresult_repository import (
     GameResultRepository,
     SourceNotFoundError,
 )
-from steaminlinebot.game.GameResult import (
+from steaminlinebot.game.gameresult import (
     ScrapedSteamGame,
     ScrapedCost,
     GameResult,
     CostData,
     GameSourceInfo,
 )
-from steaminlinebot.game.ProtonDBReport import ProtonDBReport, ProtonDBTier
-from steaminlinebot.integration.ProtonDBClient import ScrapedProtonDBReport
+from steaminlinebot.game.protondb_report import ProtonDBReport, ProtonDBTier
+from steaminlinebot.integration.protondb_client import ScrapedProtonDBReport
 
 
 def _setup_engine() -> "sqlalchemy.Engine":

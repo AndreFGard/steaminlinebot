@@ -13,14 +13,14 @@ from steaminlinebot.database.schema import (
     proton_report_table,
     ProductType_,
 )
-from steaminlinebot.game.GameResult import (
+from steaminlinebot.game.gameresult import (
     CostData,
     GameResult,
     GameSourceInfo,
     ScrapedSteamGame,
 )
-from steaminlinebot.game.ProtonDBReport import ProtonDBReport, ProtonDBTier
-from steaminlinebot.integration.ProtonDBClient import ScrapedProtonDBReport
+from steaminlinebot.game.protondb_report import ProtonDBReport, ProtonDBTier
+from steaminlinebot.integration.protondb_client import ScrapedProtonDBReport
 
 log = logging.getLogger(__name__)
 

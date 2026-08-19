@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from steaminlinebot.game import GameResult
-from steaminlinebot.game.GameSearcher import (
-    IGameSearcher,
+from steaminlinebot.game import gameresult
+from steaminlinebot.game.game_searcher_service import (
+    IGameSearcherService,
 )
 from steaminlinebot.user.UserCountry import CountryConfig, IUserCountry
 
@@ -13,7 +13,7 @@ class QueryTooShortError(ValueError): ...
 
 @dataclass
 class GameSearchResult:
-    search_results: list[GameResult.GameResult]
+    search_results: list[gameresult.GameResult]
     country_config: CountryConfig
 
 
@@ -27,7 +27,7 @@ class GameSearchUsecase(IGameSearchUsecase):
     def __init__(
         self,
         user_country: IUserCountry,
-        search_games: IGameSearcher,
+        search_games: IGameSearcherService,
     ):
         self.user_country = user_country
         self.search_games = search_games

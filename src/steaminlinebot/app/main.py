@@ -24,16 +24,16 @@ from telegram.ext import (
     InlineQueryHandler,
 )
 
-from steaminlinebot.database.GameResultRepository import GameResultRepository
-from steaminlinebot.database.UserRepository import UserRepository
-from steaminlinebot.telegram.Bot import Bot
-from steaminlinebot.telegram.TelegramPresenter import TelegramPresenter
+from steaminlinebot.database.gameresult_repository import GameResultRepository
+from steaminlinebot.database.user_repository import UserRepository
+from steaminlinebot.telegram.bot import Bot
+from steaminlinebot.telegram.telegram_presenter import TelegramPresenter
 from steaminlinebot.database import init_db
-from steaminlinebot.integration.ProtonDBClient import ProtonDBClient
-from steaminlinebot.game.GameSearchUsecase import GameSearchUsecase
-from steaminlinebot.game.GameSearcher import GameSearchService, IGameSearcher
-from steaminlinebot.integration.SteamClient import SteamClient
-from steaminlinebot.user.UserCountry import UserCountry
+from steaminlinebot.integration.protondb_client import ProtonDBClient
+from steaminlinebot.game.game import GameSearchUsecase
+from steaminlinebot.game.game_searcher_service import GameSearchService
+from steaminlinebot.integration.steam_client import SteamClient
+from steaminlinebot.user.user_country import UserCountry
 
 logLevel = {""}
 botname = os.environ.get("BOTNAME") or "@SteamInlineBot"

@@ -14,7 +14,7 @@ from telegram import (
 
 from steaminlinebot.game import GameResult
 from steaminlinebot.game.GameSearchUsecase import GameSearchResult
-from steaminlinebot.game.GameSearcher import (
+from steaminlinebot.game.GameSearcherService import (
     GameResultVM,
     ProtonDBVM,
 )

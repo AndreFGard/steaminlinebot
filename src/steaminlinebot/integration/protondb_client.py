@@ -6,7 +6,7 @@ from typing import Iterable
 
 import aiohttp
 
-from steaminlinebot.game.ProtonDBReport import ProtonDBTier
+from steaminlinebot.game.protondb_report import ProtonDBTier
 from steaminlinebot.utils.async_lru_cache_ttl import async_lru_cache_ttl
 
 

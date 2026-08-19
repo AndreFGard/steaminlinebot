@@ -9,9 +9,9 @@ from attr import dataclass
 from bs4 import BeautifulSoup
 import pydantic
 
-from steaminlinebot.game.GameResult import ScrapedCost, ScrapedSteamGame
-from steaminlinebot.integration.ProtonDBClient import IProtonDBClient
-from steaminlinebot.integration.ProtonDBClient import (
+from steaminlinebot.game.game_result import ScrapedCost, ScrapedSteamGame
+from steaminlinebot.integration.proton_db_client import IProtonDBClient
+from steaminlinebot.integration.proton_db_client import (
     ProtonDBClient,
     ScrapedProtonDBReport,
 )
