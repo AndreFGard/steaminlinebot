@@ -1,25 +1,32 @@
-from abc import ABC
 import datetime
-from enum import Enum
 import logging
-from typing import Any, NewType, Optional
+from abc import ABC, abstractmethod
+from enum import Enum
+from typing import NewType
 
 import aiohttp
 import pydantic
 
+log = logging.getLogger(__name__)
 
-class ITADPrice(pydantic.BaseModel):
+_PRICES_URL = "https://api.isthereanydeal.com/games/prices/v3"
+_SHOP_MAP_URL = "https://api.isthereanydeal.com/service/shops/map/v1"
+
+
+class _ITADModel(pydantic.BaseModel):
+    model_config = pydantic.ConfigDict(extra="allow", populate_by_name=True)
+
+
+class ITADPrice(_ITADModel):
     amount: float
-    amountInt: int
+    amount_int: int = pydantic.Field(alias="amountInt")
     currency_3l: str
 
 
-class ITADHistoricalLowInfo(pydantic.BaseModel):
-    all: Optional[ITADPrice]
-    """Best of all times"""
-    y1: Optional[ITADPrice]
-    """Best in a year"""
-    m3: Optional[ITADPrice]
+class ITADHistoricalLowInfo(_ITADModel):
+    all: ITADPrice | None = None  # Best of all times.
+    y1: ITADPrice | None = None  # Best in a year.
+    m3: ITADPrice | None = None
 
 
 class ITADDealFlag(Enum):
@@ -28,19 +35,19 @@ class ITADDealFlag(Enum):
     StoreLow = "S"
 
 
-class ITADDeal(pydantic.BaseModel):
+class ITADDeal(_ITADModel):
     shop_id: int
     shop_name: str
     price: ITADPrice
     regular: ITADPrice
     cut: int
-    """Integer 0-100"""
-    store_low: Optional[ITADPrice]
-    deal_flag: Optional[ITADDealFlag]
-    expiry: Optional[datetime.datetime]
+    """Integer 0-100."""
+    store_low: ITADPrice | None = None
+    deal_flag: ITADDealFlag | None = None
+    expiry: datetime.datetime | None = None
 
 
-class ITADPriceOverview(pydantic.BaseModel):
+class ITADPriceOverview(_ITADModel):
     id: str
     historical_low: ITADHistoricalLowInfo
     deals: list[ITADDeal]
@@ -51,86 +58,101 @@ ITADGameId = NewType("ITADGameId", str)
 ITADShopId = NewType("ITADShopId", int)
 
 
-class ITADShop(pydantic.BaseModel):
+class ITADShop(_ITADModel):
     title: str
     id: ITADShopId
 
 
-class ITADGameLookup(pydantic.BaseModel): ...
-
-
 class IITADClient(ABC):
-    # TODO add shop_id restriction
+    """Interface for the ITAD API client."""
+
+    # TODO add shop_id restriction.
+    @abstractmethod
     async def get_prices(
         self, game_ids: list[ITADGameId], country_2l: str
     ) -> list[ITADPriceOverview | None]:
-        """Up to 200 game ids"""
+        """Fetch current prices for up to 200 game ids."""
+        ...
+
+    @abstractmethod
+    async def get_shop_map(self) -> list[ITADShop]:
+        """Fetch the map of shop ids to shop names."""
+        ...
+
+    @abstractmethod
+    async def lookup_by_steam_shopid(
+        self, game_ids: list[int]
+    ) -> dict[int, str | None]:
+        """Map Steam app ids to ITAD game ids."""
         ...
 
 
-class ITADApiError(Exception): ...
+class ITADApiError(Exception):
+    """Raised when the ITAD API returns an unsuccessful response."""
+
+    def __init__(self, status: int, body: str) -> None:
+        super().__init__(f"ITAD API error {status}: {body}")
+        self.status = status
+        self.body = body
 
 
 class ITADClient(IITADClient):
-    def __init__(self, key: str, session: aiohttp.ClientSession):
+    def __init__(self, key: str, steam_shop_id: int, session: aiohttp.ClientSession):
         self._session = session
         self._key = key
         self._auth_headers = {"ITAD-API-Key": self._key}
+        self._steam_shop_id = steam_shop_id
+
+    async def _raise_for_status(self, res: aiohttp.ClientResponse) -> None:
+        if res.status != 200:
+            raise ITADApiError(res.status, await res.text())
 
     async def get_prices(
         self, game_ids: list[ITADGameId], country_2l: str
     ) -> list[ITADPriceOverview | None]:
-        URL = "https://api.isthereanydeal.com/games/prices/v3"
-
-        params = {
-            "country": country_2l,
-        }
-        req_body = game_ids
-
         res = await self._session.get(
-            URL, json=req_body, headers=self._auth_headers, params=params
+            _PRICES_URL,
+            json=game_ids,
+            headers=self._auth_headers,
+            params={"country": country_2l},
         )
-        if res.status != 200:
-            raise ITADApiError(await res.json())
+        await self._raise_for_status(res)
 
-        res_body: dict = await res.json()
+        res_body: dict[str, object] = await res.json()
 
         overviews: dict[ITADGameId, ITADPriceOverview | None] = {
             game_id: None for game_id in game_ids
         }
 
-        for price_overview_json in res_body:
+        for game_id, price_overview_json in res_body.items():
             try:
-                price_overview = ITADPriceOverview.model_validate(
-                    price_overview_json, extra="allow"
+                overviews[ITADGameId(game_id)] = ITADPriceOverview.model_validate(
+                    price_overview_json
                 )
-                overviews[ITADGameId(price_overview.id)] = price_overview
-            except Exception as e:
-                logging.error(
-                    f"Got error in validation of ITAD price_overview: {price_overview_json}; {e}"
-                )
+            except pydantic.ValidationError as e:
+                log.error("Invalid ITAD price overview for %s: %s", game_id, e)
 
         return list(overviews.values())
 
     async def get_shop_map(self) -> list[ITADShop]:
-        URL = "https://api.isthereanydeal.com/service/shops/map/v1"
-        res = await self._session.get(URL, headers=self._auth_headers)
+        res = await self._session.get(_SHOP_MAP_URL, headers=self._auth_headers)
+        await self._raise_for_status(res)
 
-        shops: list[ITADShop] = []
-        for shop in await res.json():
-            shops.append(ITADShop(title=shop["title"], id=ITADShopId(int(shop["id"]))))
+        return [ITADShop.model_validate(shop) for shop in await res.json()]
 
-        return shops
-
-    # Only supports steam because it requires a specific syntax for  the steam appid.
     async def lookup_by_steam_shopid(
-        self, shop_id: int, game_ids: list[int]
+        self, game_ids: list[int]
     ) -> dict[int, str | None]:
-        URL = f"https://api.isthereanydeal.com/lookup/id/shop/{shop_id}/v1"
+        """Map Steam app ids to ITAD game ids.
 
-        body = [f"app/{id}" for id in game_ids]
-        res = await self._session.post(URL, json=body, headers=self._auth_headers)
-        json = await res.json()
+        Only supports Steam because it requires the ``app/<id>`` syntax.
+        """
+        url = f"https://api.isthereanydeal.com/lookup/id/shop/{self._steam_shop_id}/v1"
+        body = [f"app/{app_id}" for app_id in game_ids]
+        res = await self._session.post(url, json=body, headers=self._auth_headers)
+        await self._raise_for_status(res)
 
-        # app/220 -> app/220: itadId
-        return {int(game.split("/")[1]): itadId for game, itadId in json.items()}
+        lookup = await res.json()
+
+        # app/220 -> 220: ITAD game id.
+        return {int(game.split("/")[1]): itad_id for game, itad_id in lookup.items()}

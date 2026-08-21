@@ -40,6 +40,7 @@ class GameResultRepository(IGameResultRepository):
     def __init__(self, engine: Engine):
         self._engine = engine
 
+    def add_game
     def insert_game_result(
         self, game: ScrapedSteamGame, source_name: str
     ) -> GameResult:

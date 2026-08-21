@@ -30,6 +30,7 @@ from steaminlinebot.telegram.bot import Bot
 from steaminlinebot.telegram.telegram_presenter import TelegramPresenter
 from steaminlinebot.database import init_db
 from steaminlinebot.integration.protondb_client import ProtonDBClient
+from steaminlinebot.integration.itad_client import ITADClient
 from steaminlinebot.game.game import GameSearchUsecase
 from steaminlinebot.game.game_searcher_service import GameSearchService
 from steaminlinebot.integration.steam_client import SteamClient
@@ -103,6 +104,14 @@ async def main():
             game_searcher=game_searcher,
         )
 
+        STEAM_SHOP_ID = 61
+        itad_key = os.environ.get("ITAD_KEY")
+        assert itad_key is not None
+        itad = ITADClient(itad_key, steam_shop_id=STEAM_SHOP_ID, session=session)
+
+        n = await init_db.sync_game_sources(db, itad)
+        logging.info("Synced %d game sources from ITAD", n)
+
         application = Application.builder().token(token).build()
 
         application.add_handler(CommandHandler("start", help))
@@ -117,7 +126,7 @@ async def main():
         application.add_error_handler(error)  # type: ignore
 
         # run_polling() is synchronous and manages its own event loop, so it can't be
-        # called from inside an already-running loop. Use the async API instead.
+        # called from inside an already-running loop.
         async with application:
             assert application.updater
             await application.updater.start_polling()

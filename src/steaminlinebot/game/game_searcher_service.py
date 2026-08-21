@@ -4,11 +4,11 @@ from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from steaminlinebot.database.gameresult_repository import IGameResultRepository
-from steaminlinebot.game import gameresult
-from steaminlinebot.game.gameresult import ScrapedSteamGame
-from steaminlinebot.game.protondb_report import ProtonDBTier
-from steaminlinebot.integration.steam_client import ISteamClient
+from steaminlinebot.database.GameResultRepository import IGameResultRepository
+from steaminlinebot.game import GameResult
+from steaminlinebot.game.GameResult import ScrapedSteamGame
+from steaminlinebot.game.ProtonDBReport import ProtonDBTier
+from steaminlinebot.integration.SteamClient import ISteamClient
 
 
 @dataclass
@@ -41,7 +41,7 @@ class IGameSearcherService(ABC):
         self,
         query: str,
         country_code: str,
-    ) -> list[gameresult.GameResult]: ...
+    ) -> list[GameResult.GameResult]: ...
 
 
 class GameSearchService(IGameSearcherService):
@@ -53,7 +53,7 @@ class GameSearchService(IGameSearcherService):
         self._game_result_repo = game_result_repo
         self._client = client
 
-    def _insert_scraped_game(self, game: ScrapedSteamGame) -> gameresult.GameResult:
+    def _insert_scraped_game(self, game: ScrapedSteamGame) -> GameResult.GameResult:
         return self._game_result_repo.insert_game_result(game, "Steam")
 
     async def search_game(
@@ -61,7 +61,7 @@ class GameSearchService(IGameSearcherService):
         query: str,
         country_code: str,
     ):
-        results: list[gameresult.GameResult] = []
+        results: list[GameResult.GameResult] = []
         appids = await self._client.search_game_title(query, country_code)
         res = await self._client.scrape_game_results(appids, country_code)
 
