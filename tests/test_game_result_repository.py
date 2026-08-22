@@ -1,7 +1,12 @@
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 import sqlalchemy
-from steaminlinebot.database.schema import metadata, game_source_table, country_table
+from steaminlinebot.database.schema import (
+    country_table,
+    game_external_id_table,
+    game_source_table,
+    metadata,
+)
 from steaminlinebot.database.gameresult_repository import (
     GameResultRepository,
     SourceNotFoundError,
@@ -284,3 +289,45 @@ class TestProductType:
         )
 
         assert result.product_type == "dlc"
+
+
+class TestAddGameSource:
+    def test_links_game_to_source_external_id(self):
+        engine = _setup_engine()
+        repo = GameResultRepository(engine)
+
+        # Create the game through the public repository API.
+        game = repo.insert_game_result(_make_game(appid="730"), source_name="Steam")
+
+        # Attach an additional (GOG) source to the already-created game.
+        repo.add_game_source(
+            game.id,
+            GameSourceInfo(source_name="GOG", external_id="gog-123", itad_shop_id=None),
+        )
+
+        with engine.begin() as conn:
+            gog_id = conn.execute(
+                select(game_source_table.c.id).where(game_source_table.c.name == "GOG")
+            ).scalar_one()
+            row = conn.execute(
+                select(game_external_id_table).where(
+                    game_external_id_table.c.game_id == game.id,
+                    game_external_id_table.c.source_id == gog_id,
+                )
+            ).first()
+
+        assert row is not None
+        assert row.external_id == "gog-123"
+
+    def test_raises_when_source_missing(self):
+        engine = _setup_engine()
+        repo = GameResultRepository(engine)
+        game = repo.insert_game_result(_make_game(appid="730"), source_name="Steam")
+
+        with pytest.raises(SourceNotFoundError, match="NoSuchSource"):
+            repo.add_game_source(
+                game.id,
+                GameSourceInfo(
+                    source_name="NoSuchSource", external_id="x", itad_shop_id=None
+                ),
+            )

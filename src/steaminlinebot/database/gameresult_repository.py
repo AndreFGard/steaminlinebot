@@ -35,12 +35,30 @@ class IGameResultRepository(ABC):
         self, game: ScrapedSteamGame, source_name: str
     ) -> GameResult: ...
 
+    @abstractmethod
+    def add_game_source(self, game_id: int, game_source: GameSourceInfo) -> None: ...
+
 
 class GameResultRepository(IGameResultRepository):
     def __init__(self, engine: Engine):
         self._engine = engine
 
-    def add_game
+    def add_game_source(self, game_id: int, game_source: GameSourceInfo) -> None:
+        with self._engine.begin() as conn:
+            source = _get_source(conn, game_source.source_name)
+            conn.execute(
+                sqlite_insert(game_external_id_table)
+                .values(
+                    game_id=game_id,
+                    external_id=game_source.external_id,
+                    source_id=source.id,
+                )
+                .on_conflict_do_update(
+                    index_elements=["game_id", "source_id"],
+                    set_={"external_id": game_source.external_id},
+                )
+            )
+
     def insert_game_result(
         self, game: ScrapedSteamGame, source_name: str
     ) -> GameResult:
