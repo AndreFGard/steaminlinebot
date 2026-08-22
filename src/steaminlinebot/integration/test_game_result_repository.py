@@ -7,14 +7,14 @@ from steaminlinebot.database.schema import (
     game_source_table,
     metadata,
 )
-from steaminlinebot.database.gameresult_repository import (
-    GameResultRepository,
+from steaminlinebot.database.game_repository import (
+    GameRepository,
     SourceNotFoundError,
 )
-from steaminlinebot.game.gameresult import (
+from steaminlinebot.game.core import (
     ScrapedSteamGame,
     ScrapedCost,
-    GameResult,
+    SourcedGame,
     CostData,
     GameSourceInfo,
 )
@@ -129,7 +129,7 @@ class TestInsertFullGame:
 
     def test_returns_correct_fields(self):
         engine = _setup_engine()
-        repo = GameResultRepository(engine)
+        repo = GameRepository(engine)
 
         result = repo.insert_game_result(
             _make_game(
@@ -139,7 +139,7 @@ class TestInsertFullGame:
             source_name="Steam",
         )
 
-        expected = GameResult(
+        expected = SourcedGame(
             id=0,  # stripped
             title="Counter-Strike",
             product_type="game",
@@ -176,7 +176,7 @@ class TestInsertFullGame:
     def test_ids_are_populated(self):
         """The top-level id, cost.id, and proton_db_info.game_id are set."""
         engine = _setup_engine()
-        repo = GameResultRepository(engine)
+        repo = GameRepository(engine)
 
         result = repo.insert_game_result(
             _make_game(
@@ -197,7 +197,7 @@ class TestFreeGame:
 
     def test_cost_is_none(self):
         engine = _setup_engine()
-        repo = GameResultRepository(engine)
+        repo = GameRepository(engine)
 
         result = repo.insert_game_result(
             _make_game(cost=None, proton_db_report=_make_report()),
@@ -213,7 +213,7 @@ class TestMissingProtonReport:
 
     def test_proton_db_info_is_none(self):
         engine = _setup_engine()
-        repo = GameResultRepository(engine)
+        repo = GameRepository(engine)
 
         result = repo.insert_game_result(
             _make_game(cost=_make_cost(), proton_db_report=None),
@@ -229,7 +229,7 @@ class TestDuplicateAppid:
 
     def test_second_insert_reuses_game_id(self):
         engine = _setup_engine()
-        repo = GameResultRepository(engine)
+        repo = GameRepository(engine)
 
         first = repo.insert_game_result(
             _make_game(appid="440", cost=_make_cost()),
@@ -251,7 +251,7 @@ class TestDifferentSources:
 
     def test_different_sources_yield_different_game_ids(self):
         engine = _setup_engine()
-        repo = GameResultRepository(engine)
+        repo = GameRepository(engine)
 
         steam = repo.insert_game_result(
             _make_game(appid="123", cost=_make_cost()),
@@ -272,7 +272,7 @@ class TestDifferentSources:
 class TestSourceNotFound:
     def test_raises_when_source_missing(self):
         engine = _setup_engine()
-        repo = GameResultRepository(engine)
+        repo = GameRepository(engine)
 
         with pytest.raises(SourceNotFoundError, match="NonExistentSource"):
             repo.insert_game_result(_make_game(), source_name="NonExistentSource")
@@ -281,7 +281,7 @@ class TestSourceNotFound:
 class TestProductType:
     def test_persists_dlc_product_type(self):
         engine = _setup_engine()
-        repo = GameResultRepository(engine)
+        repo = GameRepository(engine)
 
         result = repo.insert_game_result(
             _make_game(appid="999", product_type="dlc", cost=_make_cost()),
@@ -294,7 +294,7 @@ class TestProductType:
 class TestAddGameSource:
     def test_links_game_to_source_external_id(self):
         engine = _setup_engine()
-        repo = GameResultRepository(engine)
+        repo = GameRepository(engine)
 
         # Create the game through the public repository API.
         game = repo.insert_game_result(_make_game(appid="730"), source_name="Steam")
@@ -318,28 +318,27 @@ class TestAddGameSource:
 
     def test_raises_when_source_missing(self):
         engine = _setup_engine()
-        repo = GameResultRepository(engine)
+        repo = GameRepository(engine)
         game = repo.insert_game_result(_make_game(appid="730"), source_name="Steam")
 
         with pytest.raises(SourceNotFoundError, match="NoSuchSource"):
-            repo.add_game_source(
-                game.id, source_name="NoSuchSource", external_id="x"
-            )
+            repo.add_game_source(game.id, source_name="NoSuchSource", external_id="x")
+
 
 class TestGetGameSource:
     def test_gets_source_when_exists(self):
         engine = _setup_engine()
-        repo = GameResultRepository(engine)
+        repo = GameRepository(engine)
         game = repo.insert_game_result(_make_game(appid="730"), source_name="Steam")
         source_info = repo.get_source_info(game.id, "Steam")
-        
+
         assert source_info is not None
         assert source_info.source_name == "Steam"
         assert source_info.external_id == "730"
 
     def test_gets_source_when_multiple_sources_exist(self):
         engine = _setup_engine()
-        repo = GameResultRepository(engine)
+        repo = GameRepository(engine)
         game = repo.insert_game_result(_make_game(appid="730"), source_name="Steam")
         repo.add_game_source(
             game.id,
@@ -355,14 +354,10 @@ class TestGetGameSource:
     def test_filters_by_game_id_not_just_source(self):
         """Regression: get_source_info must honor game_id, not only source_id."""
         engine = _setup_engine()
-        repo = GameResultRepository(engine)
+        repo = GameRepository(engine)
 
-        steam_a = repo.insert_game_result(
-            _make_game(appid="730"), source_name="Steam"
-        )
-        steam_b = repo.insert_game_result(
-            _make_game(appid="999"), source_name="Steam"
-        )
+        steam_a = repo.insert_game_result(_make_game(appid="730"), source_name="Steam")
+        steam_b = repo.insert_game_result(_make_game(appid="999"), source_name="Steam")
 
         info_a = repo.get_source_info(steam_a.id, "Steam")
         info_b = repo.get_source_info(steam_b.id, "Steam")

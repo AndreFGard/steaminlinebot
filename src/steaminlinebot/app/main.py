@@ -24,7 +24,7 @@ from telegram.ext import (
     InlineQueryHandler,
 )
 
-from steaminlinebot.database.gameresult_repository import GameResultRepository
+from steaminlinebot.database.game_repository import GameRepository
 from steaminlinebot.database.user_repository import UserRepository
 from steaminlinebot.telegram.bot import Bot
 from steaminlinebot.telegram.telegram_presenter import TelegramPresenter
@@ -77,7 +77,7 @@ async def main():
 
     db = init_db.init_db("data/db.sqlite")
 
-    game_result_repo = GameResultRepository(db)
+    game_result_repo = GameRepository(db)
     protondb_client = ProtonDBClient()
 
     async with aiohttp.ClientSession() as session:
@@ -108,7 +108,6 @@ async def main():
         itad_key = os.environ.get("ITAD_KEY")
         assert itad_key is not None
         itad = ITADClient(itad_key, steam_shop_id=STEAM_SHOP_ID, session=session)
-
 
         application = Application.builder().token(token).build()
 

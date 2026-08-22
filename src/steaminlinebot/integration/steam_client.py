@@ -9,7 +9,7 @@ from attr import dataclass
 from bs4 import BeautifulSoup
 import pydantic
 
-from steaminlinebot.game.gameresult import ScrapedCost, ScrapedSteamGame
+from steaminlinebot.game.core import ScrapedCost, ScrapedSteamGame
 from steaminlinebot.integration.protondb_client import IProtonDBClient
 from steaminlinebot.integration.protondb_client import (
     ProtonDBClient,

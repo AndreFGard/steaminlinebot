@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from steaminlinebot.game.gameresult import GameResult
+from steaminlinebot.game.core import SourcedGame
 from steaminlinebot.game.game_searcher_service import (
     IGameSearcherService,
 )
@@ -13,7 +13,7 @@ class QueryTooShortError(ValueError): ...
 
 @dataclass
 class GameSearchResult:
-    search_results: list[GameResult]
+    search_results: list[SourcedGame]
     country_config: CountryConfig
 
 

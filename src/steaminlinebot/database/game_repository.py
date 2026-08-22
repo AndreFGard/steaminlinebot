@@ -14,9 +14,9 @@ from steaminlinebot.database.schema import (
     proton_report_table,
     ProductType_,
 )
-from steaminlinebot.game.gameresult import (
+from steaminlinebot.game.core import (
     CostData,
-    GameResult,
+    SourcedGame,
     GameSourceInfo,
     ScrapedSteamGame,
 )
@@ -30,11 +30,11 @@ class SourceNotFoundError(LookupError):
     """Raised when a named game source is not found in game_source."""
 
 
-class IGameResultRepository(ABC):
+class IGameRepository(ABC):
     @abstractmethod
     def insert_game_result(
         self, game: ScrapedSteamGame, source_name: str
-    ) -> GameResult: ...
+    ) -> SourcedGame: ...
 
     @abstractmethod
     def add_game_source(
@@ -47,7 +47,7 @@ class IGameResultRepository(ABC):
     ) -> Optional[GameSourceInfo]: ...
 
 
-class GameResultRepository(IGameResultRepository):
+class GameRepository(IGameRepository):
     def __init__(self, engine: Engine):
         self._engine = engine
 
@@ -87,14 +87,14 @@ class GameResultRepository(IGameResultRepository):
 
     def insert_game_result(
         self, game: ScrapedSteamGame, source_name: str
-    ) -> GameResult:
+    ) -> SourcedGame:
         with self._engine.begin() as conn:
             source = _get_source_by_name(conn, source_name)
             game_id = _get_or_insert_game(conn, game, source.id, game.appid)
             cost_data = _insert_cost(conn, game_id, source.id, game)
             proton_db_info = _insert_proton_report(conn, game_id, game.proton_db_report)
 
-            return GameResult(
+            return SourcedGame(
                 id=game_id,
                 title=game.title,
                 product_type=game.product_type,
