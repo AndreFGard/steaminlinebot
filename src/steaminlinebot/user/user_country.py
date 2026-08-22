@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from steaminlinebot.database.UserRepository import IUserRepository
+from steaminlinebot.database.user_repository import IUserRepository
 
 # --- constants ---
 _DEFAULT_COUNTRY = "US"

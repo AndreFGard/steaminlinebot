@@ -12,13 +12,13 @@ from telegram import (
     InputTextMessageContent,
 )
 
-from steaminlinebot.game import GameResult
-from steaminlinebot.game.GameSearchUsecase import GameSearchResult
-from steaminlinebot.game.GameSearcherService import (
+from steaminlinebot.game import gameresult
+from steaminlinebot.game.game_search_usecase import GameSearchResult
+from steaminlinebot.game.game_searcher_service import (
     GameResultVM,
     ProtonDBVM,
 )
-from steaminlinebot.user.UserCountry import CountryConfig, CountryModification
+from steaminlinebot.user.user_country import CountryConfig, CountryModification
 
 
 class SpecialResults(Enum):
@@ -86,7 +86,7 @@ def MakeSetCurrencyCallback(country_code: str) -> str:
     return f"setcurrency {country_code}"
 
 
-def _gameresult_to_gameresultvm(game: GameResult.GameResult) -> GameResultVM:
+def _gameresult_to_gameresultvm(game: gameresult.GameResult) -> GameResultVM:
     # TODO see what code will be responsible for price formatting
     price = (
         None

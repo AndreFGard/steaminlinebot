@@ -6,9 +6,9 @@ from typing import Any, Callable, Coroutine, Mapping
 from telegram import Update
 from telegram.ext import CallbackContext, InvalidCallbackData
 
-from steaminlinebot.game.GameSearchUsecase import IGameSearchUsecase, QueryTooShortError
-from steaminlinebot.telegram.TelegramPresenter import ITelegramPresenter, SpecialResults
-from steaminlinebot.user.UserCountry import IUserCountry
+from steaminlinebot.game.game_search_usecase import IGameSearchUsecase, QueryTooShortError
+from steaminlinebot.telegram.telegram_presenter import ITelegramPresenter, SpecialResults
+from steaminlinebot.user.user_country import IUserCountry
 
 
 class Bot:

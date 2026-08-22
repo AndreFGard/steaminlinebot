@@ -31,7 +31,7 @@ from steaminlinebot.telegram.telegram_presenter import TelegramPresenter
 from steaminlinebot.database import init_db
 from steaminlinebot.integration.protondb_client import ProtonDBClient
 from steaminlinebot.integration.itad_client import ITADClient
-from steaminlinebot.game.game import GameSearchUsecase
+from steaminlinebot.game.game_search_usecase import GameSearchUsecase
 from steaminlinebot.game.game_searcher_service import GameSearchService
 from steaminlinebot.integration.steam_client import SteamClient
 from steaminlinebot.user.user_country import UserCountry

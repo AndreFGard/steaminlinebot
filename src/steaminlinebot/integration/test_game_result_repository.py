@@ -331,3 +331,30 @@ class TestAddGameSource:
                     source_name="NoSuchSource", external_id="x", itad_shop_id=None
                 ),
             )
+
+class TestGetGameSource:
+    def test_gets_source_when_exists(self):
+        engine = _setup_engine()
+        repo = GameResultRepository(engine)
+        game = repo.insert_game_result(_make_game(appid="730"), source_name="Steam")
+        source_info = repo.get_source_info(game.id, "Steam")
+        
+        assert source_info is not None
+        assert source_info.source_name == "Steam"
+        assert source_info.external_id == "730"
+
+    def test_gets_source_when_multiple_sources_exist(self):
+        engine = _setup_engine()
+        repo = GameResultRepository(engine)
+        game = repo.insert_game_result(_make_game(appid="730"), source_name="Steam")
+        repo.add_game_source(
+                game.id,
+                GameSourceInfo(
+                    source_name="GPG", external_id="x", itad_shop_id=None
+                ),
+            )
+        source_info = repo.get_source_info(game.id, "Steam")
+        
+        assert source_info is not None
+        assert source_info.source_name == "Steam"
+        assert source_info.external_id == "730"
