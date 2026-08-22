@@ -10,7 +10,6 @@ from sqlalchemy import Engine, create_engine, event, text
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from steaminlinebot.database.schema import country_table, game_source_table, metadata
-from steaminlinebot.integration.itad_client import IITADClient
 
 log = logging.getLogger(__name__)
 
@@ -116,17 +115,3 @@ def init_db(database_url: str) -> Engine:
 
     return engine
 
-
-async def sync_game_sources(engine: Engine, client: IITADClient) -> int:
-    """Best-effort refresh of ``game_source`` from ITAD's live shop map."""
-    shops = await client.get_shop_map()
-    rows = [{"name": s.title, "itad_shop_id": str(s.id)} for s in shops]
-
-    stmt = sqlite_insert(game_source_table).on_conflict_do_update(
-        index_elements=["itad_shop_id"],
-        set_={"name": sqlite_insert(game_source_table).excluded.name},
-    )
-    with engine.begin() as conn:
-        conn.execute(stmt, rows)
-
-    return len(rows)

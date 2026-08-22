@@ -74,6 +74,7 @@ class ScrapedSteamGame(pydantic.BaseModel):
     cost: Optional[ScrapedCost]
     is_free: bool
     proton_db_report: Optional[ScrapedProtonDBReport] = None
+    #TODO make enum
     product_type: Literal[
         "game", "application", "tool", "demo", "dlc", "music", "mod"
     ] = "game"

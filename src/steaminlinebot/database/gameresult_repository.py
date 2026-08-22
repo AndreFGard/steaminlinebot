@@ -1,6 +1,7 @@
 import datetime
 import logging
 from abc import ABC, abstractmethod
+from typing import Optional
 
 from sqlalchemy import Connection, Engine, Row, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -36,34 +37,59 @@ class IGameResultRepository(ABC):
     ) -> GameResult: ...
 
     @abstractmethod
-    def add_game_source(self, game_id: int, game_source: GameSourceInfo) -> None: ...
+    def add_game_source(
+        self, game_id: int, source_name: str, external_id: str
+    ) -> None: ...
+
+    @abstractmethod
+    def get_source_info(
+        self, game_id: int, shop_name: str
+    ) -> Optional[GameSourceInfo]: ...
 
 
 class GameResultRepository(IGameResultRepository):
     def __init__(self, engine: Engine):
         self._engine = engine
 
-    def add_game_source(self, game_id: int, game_source: GameSourceInfo) -> None:
+    def add_game_source(self, game_id: int, source_name: str, external_id: str) -> None:
         with self._engine.begin() as conn:
-            source = _get_source(conn, game_source.source_name)
+            source = _get_source_by_name(conn, source_name)
             conn.execute(
                 sqlite_insert(game_external_id_table)
                 .values(
                     game_id=game_id,
-                    external_id=game_source.external_id,
+                    external_id=external_id,
                     source_id=source.id,
                 )
                 .on_conflict_do_update(
                     index_elements=["game_id", "source_id"],
-                    set_={"external_id": game_source.external_id},
+                    set_={"external_id": external_id},
                 )
             )
+
+    def get_source_info(self, game_id: int, shop_name: str) -> Optional[GameSourceInfo]:
+        with self._engine.begin() as conn:
+            source = _get_source_by_name(conn, shop_name)
+            row = conn.execute(
+                select(game_external_id_table).where(
+                    game_external_id_table.c.game_id == game_id,
+                    game_external_id_table.c.source_id == source.id,
+                )
+            ).first()
+            if row is not None:
+                source_info = GameSourceInfo(
+                    source_name=source.name,
+                    external_id=row.external_id,
+                    itad_shop_id=source.itad_shop_id,
+                )
+                return source_info
+            return None
 
     def insert_game_result(
         self, game: ScrapedSteamGame, source_name: str
     ) -> GameResult:
         with self._engine.begin() as conn:
-            source = _get_source(conn, source_name)
+            source = _get_source_by_name(conn, source_name)
             game_id = _get_or_insert_game(conn, game, source.id, game.appid)
             cost_data = _insert_cost(conn, game_id, source.id, game)
             proton_db_info = _insert_proton_report(conn, game_id, game.proton_db_report)
@@ -83,7 +109,7 @@ class GameResultRepository(IGameResultRepository):
             )
 
 
-def _get_source(conn: Connection, name: str) -> Row:
+def _get_source_by_name(conn: Connection, name: str) -> Row:
     """This errors if the source is not there."""
     row = conn.execute(
         select(game_source_table).where(game_source_table.c.name == name)

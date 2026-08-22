@@ -300,10 +300,7 @@ class TestAddGameSource:
         game = repo.insert_game_result(_make_game(appid="730"), source_name="Steam")
 
         # Attach an additional (GOG) source to the already-created game.
-        repo.add_game_source(
-            game.id,
-            GameSourceInfo(source_name="GOG", external_id="gog-123", itad_shop_id=None),
-        )
+        repo.add_game_source(game.id, source_name="GOG", external_id="gog-123")
 
         with engine.begin() as conn:
             gog_id = conn.execute(
@@ -326,10 +323,7 @@ class TestAddGameSource:
 
         with pytest.raises(SourceNotFoundError, match="NoSuchSource"):
             repo.add_game_source(
-                game.id,
-                GameSourceInfo(
-                    source_name="NoSuchSource", external_id="x", itad_shop_id=None
-                ),
+                game.id, source_name="NoSuchSource", external_id="x"
             )
 
 class TestGetGameSource:
@@ -348,13 +342,31 @@ class TestGetGameSource:
         repo = GameResultRepository(engine)
         game = repo.insert_game_result(_make_game(appid="730"), source_name="Steam")
         repo.add_game_source(
-                game.id,
-                GameSourceInfo(
-                    source_name="GPG", external_id="x", itad_shop_id=None
-                ),
-            )
+            game.id,
+            source_name="GOG",
+            external_id="gog-123",
+        )
         source_info = repo.get_source_info(game.id, "Steam")
-        
+
         assert source_info is not None
         assert source_info.source_name == "Steam"
         assert source_info.external_id == "730"
+
+    def test_filters_by_game_id_not_just_source(self):
+        """Regression: get_source_info must honor game_id, not only source_id."""
+        engine = _setup_engine()
+        repo = GameResultRepository(engine)
+
+        steam_a = repo.insert_game_result(
+            _make_game(appid="730"), source_name="Steam"
+        )
+        steam_b = repo.insert_game_result(
+            _make_game(appid="999"), source_name="Steam"
+        )
+
+        info_a = repo.get_source_info(steam_a.id, "Steam")
+        info_b = repo.get_source_info(steam_b.id, "Steam")
+
+        assert info_a is not None and info_a.external_id == "730"
+        assert info_b is not None and info_b.external_id == "999"
+        assert info_a.external_id != info_b.external_id

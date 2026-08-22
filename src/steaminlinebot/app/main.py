@@ -109,8 +109,6 @@ async def main():
         assert itad_key is not None
         itad = ITADClient(itad_key, steam_shop_id=STEAM_SHOP_ID, session=session)
 
-        n = await init_db.sync_game_sources(db, itad)
-        logging.info("Synced %d game sources from ITAD", n)
 
         application = Application.builder().token(token).build()
 
