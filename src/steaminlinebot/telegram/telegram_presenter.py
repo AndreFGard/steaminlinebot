@@ -99,16 +99,16 @@ def _gameresult_to_gameresultvm(game: core.SourcedGame) -> GameResultVM:
             tier=game.proton_db_info.tier,
             positive_trend=False,
             total_reports=game.proton_db_info.total,
-            appid=game.game_source.external_id,
+            appid=game.external_id,
         )
     else:
         proton_vm = None
 
     return GameResultVM(
-        id=game.id,
+        id=game.game.id,
         link=game.url,
-        title=game.title,
-        appid=game.game_source.external_id,
+        title=game.game.title,
+        appid=game.external_id,
         price=price,
         is_free=game.cost.full_value_minor == 0 if game.cost else False,
         discount=game.cost.discount if game.cost else None,

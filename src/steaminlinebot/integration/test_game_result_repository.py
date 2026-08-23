@@ -1,6 +1,8 @@
 import pytest
 from sqlalchemy import create_engine, select
 import sqlalchemy
+from typing import Optional
+
 from steaminlinebot.database.schema import (
     country_table,
     game_external_id_table,
@@ -12,26 +14,37 @@ from steaminlinebot.database.game_repository import (
     SourceNotFoundError,
 )
 from steaminlinebot.game.core import (
+    ProductType,
+    GameSource,
+    Game,
     ScrapedSteamGame,
     ScrapedCost,
     SourcedGame,
     CostData,
-    GameSourceInfo,
 )
 from steaminlinebot.game.protondb_report import ProtonDBReport, ProtonDBTier
 from steaminlinebot.integration.protondb_client import ScrapedProtonDBReport
 
 
 def _setup_engine() -> "sqlalchemy.Engine":
-    """Create an in-memory SQLite engine pre-seeded with ``country`` and ``game_source``."""
+    """Create an in-memory SQLite engine pre-seeded with ``country`` and the Steam source."""
     engine = create_engine("sqlite://")
     metadata.create_all(engine)
     with engine.begin() as conn:
         conn.execute(country_table.insert().values(alpha2="US"))
         conn.execute(country_table.insert().values(alpha2="BR"))
         conn.execute(game_source_table.insert().values(name="Steam", itad_shop_id="61"))
-        conn.execute(game_source_table.insert().values(name="GOG", itad_shop_id=None))
     return engine
+
+
+def _seed_source(
+    engine: "sqlalchemy.Engine", name: str, itad_shop_id: Optional[str] = None
+) -> None:
+    """Insert an additional game source (e.g. ITAD) into the engine."""
+    with engine.begin() as conn:
+        conn.execute(
+            game_source_table.insert().values(name=name, itad_shop_id=itad_shop_id)
+        )
 
 
 def _make_game(
@@ -50,7 +63,7 @@ def _make_game(
         cost=cost,
         is_free=is_free,
         proton_db_report=proton_db_report,
-        product_type=product_type,
+        product_type=ProductType(product_type),
     )
 
 
@@ -86,9 +99,6 @@ def _make_report(
         total=total,
         trending_tier=trending_tier,
     )
-
-
-# Keys stripped from models before comparison
 
 
 def _strip_ids(obj):
@@ -136,13 +146,13 @@ class TestInsertFullGame:
                 cost=_make_cost(),
                 proton_db_report=_make_report(),
             ),
-            source_name="Steam",
+            game_source=GameSource.STEAM,
         )
 
         expected = SourcedGame(
-            id=0,  # stripped
-            title="Counter-Strike",
-            product_type="game",
+            game=Game(id=0, title="Counter-Strike", product_type=ProductType.GAME),
+            external_id="730",
+            game_source=GameSource.STEAM,
             cost=CostData(
                 id=0,  # stripped
                 value_minor=999,
@@ -155,13 +165,8 @@ class TestInsertFullGame:
                 historical_deal=None,
             ),
             url="https://store.steampowered.com/app/730/",
-            game_source=GameSourceInfo(
-                source_name="Steam",
-                external_id="730",
-                itad_shop_id="61",
-            ),
             proton_db_info=ProtonDBReport(
-                game_id=0,
+                game_id=0,  # stripped
                 best_reported_tier=ProtonDBTier.GOLD,
                 confidence="Strong",
                 score=0.9,
@@ -174,7 +179,7 @@ class TestInsertFullGame:
         assert_model_equal(result, expected)
 
     def test_ids_are_populated(self):
-        """The top-level id, cost.id, and proton_db_info.game_id are set."""
+        """The canonical game id, cost.id, and proton_db_info.game_id are set."""
         engine = _setup_engine()
         repo = GameRepository(engine)
 
@@ -183,13 +188,13 @@ class TestInsertFullGame:
                 cost=_make_cost(),
                 proton_db_report=_make_report(),
             ),
-            source_name="Steam",
+            game_source=GameSource.STEAM,
         )
 
-        assert isinstance(result.id, int) and result.id > 0
+        assert isinstance(result.game.id, int) and result.game.id > 0
         assert result.cost is not None and result.cost.id > 0
         assert result.proton_db_info is not None and result.proton_db_info.game_id > 0
-        assert result.proton_db_info.game_id == result.id
+        assert result.proton_db_info.game_id == result.game.id
 
 
 class TestFreeGame:
@@ -201,7 +206,7 @@ class TestFreeGame:
 
         result = repo.insert_game_result(
             _make_game(cost=None, proton_db_report=_make_report()),
-            source_name="Steam",
+            game_source=GameSource.STEAM,
         )
 
         assert result.cost is None
@@ -217,7 +222,7 @@ class TestMissingProtonReport:
 
         result = repo.insert_game_result(
             _make_game(cost=_make_cost(), proton_db_report=None),
-            source_name="Steam",
+            game_source=GameSource.STEAM,
         )
 
         assert result.cost is not None
@@ -233,15 +238,15 @@ class TestDuplicateAppid:
 
         first = repo.insert_game_result(
             _make_game(appid="440", cost=_make_cost()),
-            source_name="Steam",
+            game_source=GameSource.STEAM,
         )
         second = repo.insert_game_result(
             _make_game(appid="440", cost=_make_cost(value_minor=499)),
-            source_name="Steam",
+            game_source=GameSource.STEAM,
         )
 
         # Same game row, two different cost observations
-        assert second.id == first.id
+        assert second.game.id == first.game.id
         assert second.cost is not None and second.cost.id != first.cost.id  # type: ignore[union-attr]
         assert second.cost.value_minor == 499  # type: ignore[union-attr]
 
@@ -251,22 +256,21 @@ class TestDifferentSources:
 
     def test_different_sources_yield_different_game_ids(self):
         engine = _setup_engine()
+        _seed_source(engine, "ITAD")
         repo = GameRepository(engine)
 
         steam = repo.insert_game_result(
             _make_game(appid="123", cost=_make_cost()),
-            source_name="Steam",
+            game_source=GameSource.STEAM,
         )
-        gog = repo.insert_game_result(
+        itad = repo.insert_game_result(
             _make_game(appid="123", cost=_make_cost()),
-            source_name="GOG",
+            game_source=GameSource.ITAD,
         )
 
-        assert steam.id != gog.id
-        assert steam.game_source.source_name == "Steam"
-        assert gog.game_source.source_name == "GOG"
-        # GOG has no itad_shop_id
-        assert gog.game_source.itad_shop_id is None
+        assert steam.game.id != itad.game.id
+        assert steam.game_source == GameSource.STEAM
+        assert itad.game_source == GameSource.ITAD
 
 
 class TestSourceNotFound:
@@ -274,8 +278,8 @@ class TestSourceNotFound:
         engine = _setup_engine()
         repo = GameRepository(engine)
 
-        with pytest.raises(SourceNotFoundError, match="NonExistentSource"):
-            repo.insert_game_result(_make_game(), source_name="NonExistentSource")
+        with pytest.raises(SourceNotFoundError, match="ITAD"):
+            repo.insert_game_result(_make_game(), game_source=GameSource.ITAD)
 
 
 class TestProductType:
@@ -285,83 +289,97 @@ class TestProductType:
 
         result = repo.insert_game_result(
             _make_game(appid="999", product_type="dlc", cost=_make_cost()),
-            source_name="Steam",
+            game_source=GameSource.STEAM,
         )
 
-        assert result.product_type == "dlc"
+        assert result.game.product_type == ProductType.DLC
 
 
 class TestAddGameSource:
     def test_links_game_to_source_external_id(self):
         engine = _setup_engine()
+        _seed_source(engine, "ITAD")
         repo = GameRepository(engine)
 
         # Create the game through the public repository API.
-        game = repo.insert_game_result(_make_game(appid="730"), source_name="Steam")
+        sourced = repo.insert_game_result(
+            _make_game(appid="730"), game_source=GameSource.STEAM
+        )
 
-        # Attach an additional (GOG) source to the already-created game.
-        repo.add_game_source(game.id, source_name="GOG", external_id="gog-123")
+        # Attach an additional (ITAD) source to the already-created game.
+        repo.add_game_source(
+            sourced.game.id, game_source=GameSource.ITAD, external_id="itad-123"
+        )
 
         with engine.begin() as conn:
-            gog_id = conn.execute(
-                select(game_source_table.c.id).where(game_source_table.c.name == "GOG")
+            itad_id = conn.execute(
+                select(game_source_table.c.id).where(game_source_table.c.name == "ITAD")
             ).scalar_one()
             row = conn.execute(
                 select(game_external_id_table).where(
-                    game_external_id_table.c.game_id == game.id,
-                    game_external_id_table.c.source_id == gog_id,
+                    game_external_id_table.c.game_id == sourced.game.id,
+                    game_external_id_table.c.source_id == itad_id,
                 )
             ).first()
 
         assert row is not None
-        assert row.external_id == "gog-123"
+        assert row.external_id == "itad-123"
 
     def test_raises_when_source_missing(self):
         engine = _setup_engine()
         repo = GameRepository(engine)
-        game = repo.insert_game_result(_make_game(appid="730"), source_name="Steam")
+        sourced = repo.insert_game_result(
+            _make_game(appid="730"), game_source=GameSource.STEAM
+        )
 
-        with pytest.raises(SourceNotFoundError, match="NoSuchSource"):
-            repo.add_game_source(game.id, source_name="NoSuchSource", external_id="x")
+        with pytest.raises(SourceNotFoundError, match="ITAD"):
+            repo.add_game_source(
+                sourced.game.id, game_source=GameSource.ITAD, external_id="x"
+            )
 
 
 class TestGetGameSource:
     def test_gets_source_when_exists(self):
         engine = _setup_engine()
         repo = GameRepository(engine)
-        game = repo.insert_game_result(_make_game(appid="730"), source_name="Steam")
-        source_info = repo.get_source_info(game.id, "Steam")
+        sourced = repo.insert_game_result(
+            _make_game(appid="730"), game_source=GameSource.STEAM
+        )
+        external_id = repo.get_game_id_on_source(sourced.game.id, GameSource.STEAM)
 
-        assert source_info is not None
-        assert source_info.source_name == "Steam"
-        assert source_info.external_id == "730"
+        assert external_id == "730"
 
     def test_gets_source_when_multiple_sources_exist(self):
         engine = _setup_engine()
+        _seed_source(engine, "ITAD")
         repo = GameRepository(engine)
-        game = repo.insert_game_result(_make_game(appid="730"), source_name="Steam")
-        repo.add_game_source(
-            game.id,
-            source_name="GOG",
-            external_id="gog-123",
+        sourced = repo.insert_game_result(
+            _make_game(appid="730"), game_source=GameSource.STEAM
         )
-        source_info = repo.get_source_info(game.id, "Steam")
+        repo.add_game_source(
+            sourced.game.id,
+            game_source=GameSource.ITAD,
+            external_id="itad-123",
+        )
+        external_id = repo.get_game_id_on_source(sourced.game.id, GameSource.STEAM)
 
-        assert source_info is not None
-        assert source_info.source_name == "Steam"
-        assert source_info.external_id == "730"
+        assert external_id == "730"
 
     def test_filters_by_game_id_not_just_source(self):
-        """Regression: get_source_info must honor game_id, not only source_id."""
+        """Regression: get_game_id_on_source must honor game_id, not only source_id."""
         engine = _setup_engine()
         repo = GameRepository(engine)
 
-        steam_a = repo.insert_game_result(_make_game(appid="730"), source_name="Steam")
-        steam_b = repo.insert_game_result(_make_game(appid="999"), source_name="Steam")
+        steam_a = repo.insert_game_result(
+            _make_game(appid="730"), game_source=GameSource.STEAM
+        )
+        steam_b = repo.insert_game_result(
+            _make_game(appid="999"), game_source=GameSource.STEAM
+        )
 
-        info_a = repo.get_source_info(steam_a.id, "Steam")
-        info_b = repo.get_source_info(steam_b.id, "Steam")
+        ext_a = repo.get_game_id_on_source(steam_a.game.id, GameSource.STEAM)
+        ext_b = repo.get_game_id_on_source(steam_b.game.id, GameSource.STEAM)
 
-        assert info_a is not None and info_a.external_id == "730"
-        assert info_b is not None and info_b.external_id == "999"
-        assert info_a.external_id != info_b.external_id
+        assert ext_a == "730"
+        assert ext_b == "999"
+        assert ext_a != ext_b

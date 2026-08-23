@@ -26,7 +26,7 @@ game_external_id_table = sql.Table(
 )
 
 
-class ProductType_(enum.Enum):
+class DBProductType(enum.Enum):
     GAME = "game"
     APPLICATION = "application"
     TOOL = "tool"
@@ -43,8 +43,8 @@ game_table = sql.Table(
     sql.Column("title", sql.String(), nullable=False),
     sql.Column(
         "product_type",
-        sql.Enum(ProductType_),
-        default=ProductType_.GAME,
+        sql.Enum(DBProductType),
+        default=DBProductType.GAME,
         nullable=False,
     ),
 )

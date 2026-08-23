@@ -5,7 +5,7 @@ from typing import Optional
 
 from steaminlinebot.database.game_repository import IGameRepository
 from steaminlinebot.game import core
-from steaminlinebot.game.core import ScrapedSteamGame
+from steaminlinebot.game.core import GameSource, ScrapedSteamGame
 from steaminlinebot.game.protondb_report import ProtonDBTier
 from steaminlinebot.integration.steam_client import ISteamClient
 
@@ -52,10 +52,8 @@ class GameSearchService(IGameSearcherService):
         self._game_result_repo = game_result_repo
         self._client = client
 
-    def _insert_scraped_game(
-        self, game: ScrapedSteamGame
-    ) -> core.SourcedGame:
-        return self._game_result_repo.insert_game_result(game, "Steam")
+    def _insert_scraped_game(self, game: ScrapedSteamGame) -> core.SourcedGame:
+        return self._game_result_repo.insert_game_result(game, GameSource("Steam"))
 
     async def search_game(
         self,
