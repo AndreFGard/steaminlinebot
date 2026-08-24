@@ -1,0 +1,221 @@
+import datetime
+import logging
+from abc import ABC, abstractmethod
+from typing import Optional
+
+from sqlalchemy import Connection, Engine, Row, select
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+
+from steaminlinebot.database.schema import (
+    cost_table,
+    game_external_id_table,
+    game_source_table,
+    game_table,
+    proton_report_table,
+    DBProductType,
+)
+from steaminlinebot.game.core import (
+    CostData,
+    Game,
+    GameSource,
+    SourcedGame,
+    ScrapedSteamGame,
+)
+from steaminlinebot.game.protondb_report import ProtonDBReport, ProtonDBTier
+from steaminlinebot.integration.protondb_client import ScrapedProtonDBReport
+
+log = logging.getLogger(__name__)
+
+
+class SourceNotFoundError(LookupError):
+    """Raised when a named game source is not found in game_source."""
+
+
+class IGameRepository(ABC):
+    @abstractmethod
+    def add_game_source(
+        self, game_id: int, game_source: GameSource, external_id: str
+    ) -> None: ...
+
+    @abstractmethod
+    def insert_game_result(
+        self, game: ScrapedSteamGame, game_source: GameSource
+    ) -> SourcedGame:
+        """Returns the id on the specified index"""
+        ...
+
+
+class GameRepository(IGameRepository):
+    def __init__(self, engine: Engine):
+        self._engine = engine
+
+    def add_game_source(
+        self, game_id: int, game_source: GameSource, external_id: str
+    ) -> None:
+        with self._engine.begin() as conn:
+            source = _get_source_by_name(conn, game_source.value)
+            conn.execute(
+                sqlite_insert(game_external_id_table)
+                .values(
+                    game_id=game_id,
+                    external_id=external_id,
+                    source_id=source.id,
+                )
+                .on_conflict_do_update(
+                    index_elements=["game_id", "source_id"],
+                    set_={"external_id": external_id},
+                )
+            )
+
+    def get_game_id_on_source(
+        self, game_id: int, game_source: GameSource
+    ) -> Optional[str]:
+        with self._engine.begin() as conn:
+            source = _get_source_by_name(conn, game_source.value)
+            row = conn.execute(
+                select(game_external_id_table).where(
+                    game_external_id_table.c.game_id == game_id,
+                    game_external_id_table.c.source_id == source.id,
+                )
+            ).first()
+            if row is not None:
+                return row.external_id
+            return None
+
+    def insert_game_result(
+        self, game: ScrapedSteamGame, game_source: GameSource
+    ) -> SourcedGame:
+        with self._engine.begin() as conn:
+            source = _get_source_by_name(conn, game_source.value)
+            game_id = _get_or_insert_game(conn, game, source.id, game.appid)
+            hello = Game(id=game_id, title=game.title, product_type=game.product_type)
+
+            cost_data = _insert_cost(conn, game_id, source.id, game)
+            proton_db_info = _insert_proton_report(conn, game_id, game.proton_db_report)
+
+            return SourcedGame(
+                game=hello,
+                external_id=game.appid,
+                game_source=game_source,
+                cost=cost_data,
+                url=game.link,
+                proton_db_info=proton_db_info,
+            )
+
+
+def _get_source_by_name(conn: Connection, name: str) -> Row:
+    """This errors if the source is not there."""
+    row = conn.execute(
+        select(game_source_table).where(game_source_table.c.name == name)
+    ).first()
+
+    if row is None:
+        raise SourceNotFoundError(
+            f"Game source '{name}' not found in game_source table."
+        )
+
+    return row
+
+
+def _get_or_insert_game(
+    conn: Connection, game: ScrapedSteamGame, source_id: int, appid: str
+) -> int:
+    """Return existing game_id, or insert a new game + external-id row."""
+    existing = conn.execute(
+        select(game_external_id_table.c.game_id).where(
+            game_external_id_table.c.source_id == source_id,
+            game_external_id_table.c.external_id == appid,
+        )
+    ).first()
+
+    if existing is not None:
+        return existing.game_id
+
+    result = conn.execute(
+        game_table.insert().values(
+            title=game.title,
+            product_type=DBProductType(game.product_type.value),
+        )
+    )
+    game_id: int = result.inserted_primary_key[0]  # type: ignore[assignment]
+
+    conn.execute(
+        sqlite_insert(game_external_id_table)
+        .values(game_id=game_id, source_id=source_id, external_id=appid)
+        .on_conflict_do_nothing(index_elements=["source_id", "external_id"])
+    )
+
+    return game_id
+
+
+def _insert_cost(
+    conn: Connection, game_id: int, source_id: int, game: ScrapedSteamGame
+) -> CostData | None:
+    if game.cost is None:
+        return None
+
+    cost = game.cost
+    now = datetime.datetime.now(datetime.timezone.utc)
+
+    result = conn.execute(
+        cost_table.insert().values(
+            game_id=game_id,
+            source_id=source_id,
+            country_alpha2=cost.country_l2,
+            currency=cost.currency_3l,
+            collected_date=None,  # TODO: scraper does not provide this yet
+            insertion_date=now,
+            value_minor=cost.value_minor,
+            full_value_minor=cost.full_value_minor,
+            discount=cost.discount,
+            flag=None,
+            price_expires_at=None,
+            url=game.link,
+        )
+    )
+    cost_id: int = result.inserted_primary_key[0]  # type: ignore[assignment]
+
+    return CostData(
+        id=cost_id,
+        value_minor=cost.value_minor,
+        currency_3l=cost.currency_3l,
+        full_value_minor=cost.full_value_minor,
+        discount=cost.discount,
+        country_l2=cost.country_l2,
+        price_expires_at=None,
+        observed_date=None,
+        historical_deal=None,
+    )
+
+
+def _insert_proton_report(
+    conn: Connection,
+    game_id: int,
+    report: ScrapedProtonDBReport | None,
+) -> ProtonDBReport | None:
+    if report is None:
+        return None
+
+    conn.execute(
+        proton_report_table.insert().values(
+            game_id=game_id,
+            source_id=None,
+            best_reported_tier=report.best_reported_tier,
+            confidence=report.confidence,
+            score=report.score,
+            tier=report.tier,
+            total=report.total,
+            trending_tier=report.trending_tier,
+            collected_date=datetime.datetime.now(datetime.timezone.utc),
+        )
+    )
+
+    return ProtonDBReport(
+        game_id=game_id,
+        best_reported_tier=ProtonDBTier(report.best_reported_tier),
+        confidence=report.confidence,
+        score=report.score,
+        tier=ProtonDBTier(report.tier),
+        total=report.total,
+        trending_tier=ProtonDBTier(report.trending_tier),
+    )

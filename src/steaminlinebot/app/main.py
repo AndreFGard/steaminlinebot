@@ -5,12 +5,15 @@
 @Steaminlinebot written by Andrefgard on github
 """
 
+import asyncio
 import logging
 import os
+import signal
 import sys
 from logging import DEBUG, INFO, WARNING, basicConfig
 
 
+import aiohttp
 from telegram import (
     Update,
 )
@@ -21,17 +24,17 @@ from telegram.ext import (
     InlineQueryHandler,
 )
 
-from steaminlinebot.telegram.Bot import Bot
-from steaminlinebot.telegram.TelegramPresenter import TelegramPresenter
+from steaminlinebot.database.game_repository import GameRepository
+from steaminlinebot.database.user_repository import UserRepository
+from steaminlinebot.telegram.bot import Bot
+from steaminlinebot.telegram.telegram_presenter import TelegramPresenter
 from steaminlinebot.database import init_db
-from steaminlinebot.database.GameResultRepository import GameResultRepository
-from steaminlinebot.database.UserRepository import UserRepository
-from steaminlinebot.integration.ProtonDBClient import ProtonDBClient
-from steaminlinebot.game.GameSearchUsecase import GameSearchUsecase
-from steaminlinebot.game.SteamProvider import SteamProvider
-from steaminlinebot.integration.SteamClient import SteamClient, SteamRequestMaker
-from steaminlinebot.user.UserCountry import UserCountry
-from steaminlinebot.user.UserCountryUsecase import UserCountryUsecase
+from steaminlinebot.integration.protondb_client import ProtonDBClient
+from steaminlinebot.integration.itad_client import ITADClient
+from steaminlinebot.game.game_search_usecase import GameSearchUsecase
+from steaminlinebot.game.game_searcher_service import GameSearchService
+from steaminlinebot.integration.steam_client import SteamClient
+from steaminlinebot.user.user_country import UserCountry
 
 logLevel = {""}
 botname = os.environ.get("BOTNAME") or "@SteamInlineBot"
@@ -65,7 +68,7 @@ async def error(update: Update, context):
     print(f"Update {update} caused error {context.error}")
 
 
-def main():
+async def main():
     try:
         token = os.environ["BOT_TOKEN"]
     except KeyError:
@@ -74,47 +77,71 @@ def main():
 
     db = init_db.init_db("data/db.sqlite")
 
-    user_repo = UserRepository(db)
-    game_result_repo = GameResultRepository(db)
+    game_result_repo = GameRepository(db)
     protondb_client = ProtonDBClient()
-    steam_client = SteamClient(
-        max_results=6,
-        steam_request_maker=SteamRequestMaker(),
-        protondb_client=protondb_client,
-    )
-    user_country = UserCountry(user_repo=user_repo)
-    search_games = SteamProvider(
-        client=steam_client,
-        game_result_repo=game_result_repo,
-    )
-    presenter = TelegramPresenter()
-    game_searcher = GameSearchUsecase(
-        user_country=user_country,
-        search_games=search_games,
-        default_country_code="US",
-    )
-    user_country_usecase = UserCountryUsecase(user_country=user_country)
-    bot = Bot(
-        user_country_usecase=user_country_usecase,
-        presenter=presenter,
-        game_searcher=game_searcher,
-    )
 
-    application = Application.builder().token(token).build()
+    async with aiohttp.ClientSession() as session:
+        steam_client = SteamClient(
+            session,
+            protondb_client=protondb_client,
+        )
 
-    application.add_handler(CommandHandler("start", help))
-    application.add_handler(CommandHandler("help", help))
+        user_repo = UserRepository(db)
+        user_country = UserCountry(user_repo=user_repo)
+        search_games = GameSearchService(
+            client=steam_client,
+            game_result_repo=game_result_repo,
+        )
+        presenter = TelegramPresenter()
+        game_searcher = GameSearchUsecase(
+            user_country=user_country,
+            search_games=search_games,
+        )
 
-    application.add_handler(InlineQueryHandler(bot.handle_inline_query))
+        bot = Bot(
+            user_country=user_country,
+            presenter=presenter,
+            game_searcher=game_searcher,
+        )
 
-    application.add_handler(CommandHandler("setcurrency", bot.set_currency))
-    application.add_handler(CommandHandler("deleteinfo", bot.delete_user_info))
-    application.add_handler(CallbackQueryHandler(bot.callback_handler))
+        STEAM_SHOP_ID = 61
+        itad_key = os.environ.get("ITAD_KEY")
+        assert itad_key is not None
+        itad = ITADClient(itad_key, steam_shop_id=STEAM_SHOP_ID, session=session)
 
-    application.add_error_handler(error)  # type: ignore
+        application = Application.builder().token(token).build()
 
-    application.run_polling()
+        application.add_handler(CommandHandler("start", help))
+        application.add_handler(CommandHandler("help", help))
+
+        application.add_handler(InlineQueryHandler(bot.handle_inline_query))
+
+        application.add_handler(CommandHandler("setcurrency", bot.set_currency))
+        application.add_handler(CommandHandler("deleteinfo", bot.delete_user_info))
+        application.add_handler(CallbackQueryHandler(bot.callback_handler))
+
+        application.add_error_handler(error)  # type: ignore
+
+        # run_polling() is synchronous and manages its own event loop, so it can't be
+        # called from inside an already-running loop.
+        async with application:
+            assert application.updater
+            await application.updater.start_polling()
+            await application.start()
+
+            stop_event = asyncio.Event()
+            loop = asyncio.get_running_loop()
+            for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGABRT):
+                try:
+                    loop.add_signal_handler(sig, stop_event.set)
+                except NotImplementedError:
+                    pass
+
+            await stop_event.wait()
+
+            await application.updater.stop()
+            await application.stop()
 
 
-if __name__ == "__main__":
-    main()
+def run():
+    asyncio.run(main())

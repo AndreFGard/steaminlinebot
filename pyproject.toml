@@ -11,6 +11,7 @@ dependencies = [
     "gazpacho>=1.1",
     "pydantic>=2.13.4",
     "python-telegram-bot>=22.8",
+    "sqlalchemy>=2.0.51",
 ]
 
 [dependency-groups]
@@ -21,8 +22,12 @@ dev = [
 ]
 
 [project.scripts]
-bot = "steaminlinebot.app.main:main"
+bot = "steaminlinebot.app.main:run"
 
 [build-system]
 requires = ["uv_build>=0.11.29,<0.12"]
 build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["src"]
+asyncio_mode = "auto"

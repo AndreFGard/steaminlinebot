@@ -12,46 +12,19 @@ from telegram import (
     InputTextMessageContent,
 )
 
-from steaminlinebot.game.GameSearchUsecase import GameSearchResult
-from steaminlinebot.game.SteamProvider import (
+from steaminlinebot.game import core
+from steaminlinebot.game.game_search_usecase import GameSearchResult
+from steaminlinebot.game.game_searcher_service import (
     GameResultVM,
     ProtonDBVM,
 )
-from steaminlinebot.user.UserCountry import CountryConfig, CountryModification
+from steaminlinebot.user.user_country import CountryConfig, CountryModification
 
 
 class SpecialResults(Enum):
     NO_MATCHES = 1
     ERROR = 2
     QUERY_TOO_SHORT = 4
-
-
-class ITelegramPresenter(ABC):
-    """Builds Telegram API objects from domain view models.
-
-    This is the inversion boundary: domain/services speak in view models,
-    the presenter translates them into Telegram API objects.
-    Mock this interface to test handlers without Telegram API objects.
-    """
-
-    @abstractmethod
-    def make_inline_query_presentation(
-        self,
-        result: GameSearchResult,
-    ) -> "TelegramInlineResultListPres": ...
-
-    @abstractmethod
-    def make_error_presentation(
-        self, error: "SpecialResults"
-    ) -> "TelegramInlineResultListPres": ...
-
-    @abstractmethod
-    def make_delete_confirmation(self, success: bool) -> "TelegramPresentation": ...
-
-    @abstractmethod
-    def make_currency_message_from_country(
-        self, country_mod: CountryModification
-    ) -> "TelegramCountryPres": ...
 
 
 @dataclass
@@ -80,8 +53,67 @@ class TelegramInlineResultListPres:
     button: Optional[InlineQueryResultsButton]
 
 
+class ITelegramPresenter(ABC):
+    """Builds Telegram API objects from domain view models.
+
+    This is the inversion boundary: domain/services speak in view models,
+    the presenter translates them into Telegram API objects.
+    Mock this interface to test handlers without Telegram API objects.
+    """
+
+    @abstractmethod
+    def make_inline_query_presentation(
+        self,
+        result: GameSearchResult,
+    ) -> "TelegramInlineResultListPres": ...
+
+    @abstractmethod
+    def make_error_presentation(
+        self, error: "SpecialResults"
+    ) -> "TelegramInlineResultListPres": ...
+
+    @abstractmethod
+    def make_delete_confirmation(self, success: bool) -> "TelegramPresentation": ...
+
+    def make_currency_message_from_country(
+        self,
+        country_mod: Optional[CountryModification],
+        alternative_suggestions: list[str],
+    ) -> TelegramCountryPres: ...
+
+
 def MakeSetCurrencyCallback(country_code: str) -> str:
     return f"setcurrency {country_code}"
+
+
+def _gameresult_to_gameresultvm(game: core.SourcedGame) -> GameResultVM:
+    # TODO see what code will be responsible for price formatting
+    price = (
+        None
+        if not game.cost
+        else f"{game.cost.value_minor} {game.cost.currency_3l} ({game.cost.country_l2})"
+    )
+
+    if game.proton_db_info:
+        proton_vm = ProtonDBVM(
+            tier=game.proton_db_info.tier,
+            positive_trend=False,
+            total_reports=game.proton_db_info.total,
+            appid=game.external_id,
+        )
+    else:
+        proton_vm = None
+
+    return GameResultVM(
+        id=game.game.id,
+        link=game.url,
+        title=game.game.title,
+        appid=game.external_id,
+        price=price,
+        is_free=game.cost.full_value_minor == 0 if game.cost else False,
+        discount=game.cost.discount if game.cost else None,
+        proton_db=proton_vm,
+    )
 
 
 class TelegramPresenter(ITelegramPresenter):
@@ -173,10 +205,14 @@ class TelegramPresenter(ITelegramPresenter):
         self,
         result: GameSearchResult,
     ) -> TelegramInlineResultListPres:
-        articles = [
-            self._make_inline_game_article(game, result.country_config).query_article
-            for game in result.search_results.results
-        ]
+        articles = []
+        for game in result.search_results:
+            game_vm = _gameresult_to_gameresultvm(game)
+            article = self._make_inline_game_article(
+                game_vm, result.country_config
+            ).query_article
+            articles.append(article)
+
         if not articles:
             articles.append(
                 self._make_special_inline_query_result(SpecialResults.NO_MATCHES)
@@ -225,9 +261,12 @@ class TelegramPresenter(ITelegramPresenter):
         return InlineKeyboardMarkup(keyboard)
 
     def make_currency_message_from_country(
-        self, country_mod: CountryModification
+        self,
+        country_mod: Optional[CountryModification],
+        alternative_suggestions: list[str],
     ) -> TelegramCountryPres:
-        if country_mod.configured_country or country_mod.requested_country:
+
+        if country_mod:
             if country_mod.configured_country:
                 text = (
                     f"Your currency has been set to {country_mod.configured_country}✅"
@@ -238,14 +277,14 @@ class TelegramPresenter(ITelegramPresenter):
                     f"Could not set currency to *{country_mod.requested_country}*. Is it a valid country code?"
                     "\nPerhaps you meant one of those:"
                 )
-                kb = self._make_country_keyboard(country_mod.alternative_suggestions)
+                kb = self._make_country_keyboard(alternative_suggestions)
         else:
             text = (
                 "**How to set your currency:**\n"
                 "Use `/setcurrency CODE` (e.g., `/setcurrency US`).\n\n"
                 "Select one of the popular options below:"
             )
-            kb = self._make_country_keyboard(country_mod.alternative_suggestions)
+            kb = self._make_country_keyboard(alternative_suggestions)
 
         return TelegramCountryPres(text=text, keyboard=kb, parse_mode="Markdown")
 
