@@ -20,11 +20,11 @@ from steaminlinebot.integration.protondb_client import (
 # which can be used to reduce the bot latency.
 
 
-class GameAppid(pydantic.BaseModel):
+class SteamGame(pydantic.BaseModel):
     appid: str
     country_2l: str
-
-    _title: Optional[str]
+    title: Optional[str]
+    
     _formatted_price: Optional[str]
 
 
@@ -40,10 +40,10 @@ class ISteamClient(ABC):
     @abstractmethod
     async def search_game_title(
         self, query: str, country_2l: str
-    ) -> list[GameAppid]: ...
+    ) -> list[SteamGame]: ...
     @abstractmethod
     async def scrape_game_results(
-        self, appids: list[GameAppid], country: str
+        self, appids: list[SteamGame], country: str
     ) -> ScrapeResult: ...
 
 
@@ -130,7 +130,7 @@ async def _get_many_game_details(
 
 def parse_game_appids_from_suggest_html(
     suggest_html_data: BeautifulSoup, country_2l: str
-) -> list[GameAppid]:
+) -> list[SteamGame]:
 
     games = []
     for game in suggest_html_data.find_all("a"):
@@ -146,9 +146,9 @@ def parse_game_appids_from_suggest_html(
                 name = str(name)
 
             games.append(
-                GameAppid(
+                SteamGame(
                     appid=appid,
-                    _title=name,
+                    title=name,
                     _formatted_price=price,
                     country_2l=country_2l,
                 )
@@ -165,7 +165,7 @@ class SteamClient(ISteamClient):
         self._session = session
         self._protondb = protondb_client or ProtonDBClient()
 
-    async def search_game_title(self, query: str, country_2l: str) -> list[GameAppid]:
+    async def search_game_title(self, query: str, country_2l: str) -> list[SteamGame]:
         # This was the endpoint used as you typed in the steam search bar. Now unused by the steam store.
         _GAME_SEARCH_SUGGEST_URL = "https://store.steampowered.com/search/suggest"
 
@@ -189,7 +189,7 @@ class SteamClient(ISteamClient):
         return appids
 
     async def scrape_game_results(
-        self, appids: list[GameAppid], country: str
+        self, appids: list[SteamGame], country: str
     ) -> ScrapeResult:
         """gets game details for each appid found in the search for the given
         query(game name) and makes ScrapedGame obj from each of those and returns a list of them all

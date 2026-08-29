@@ -90,8 +90,8 @@ def _gameresult_to_gameresultvm(game: core.SourcedGame) -> GameResultVM:
     # TODO see what code will be responsible for price formatting
     price = (
         None
-        if not game.cost
-        else f"{game.cost.value_minor} {game.cost.currency_3l} ({game.cost.country_l2})"
+        if not game.deals
+        else f"{game.deals.value_minor} {game.deals.currency_3l} ({game.deals.country_l2})"
     )
 
     if game.proton_db_info:
@@ -110,8 +110,8 @@ def _gameresult_to_gameresultvm(game: core.SourcedGame) -> GameResultVM:
         title=game.game.title,
         appid=game.external_id,
         price=price,
-        is_free=game.cost.full_value_minor == 0 if game.cost else False,
-        discount=game.cost.discount if game.cost else None,
+        is_free=game.deals.full_value_minor == 0 if game.deals else False,
+        discount=game.deals.discount if game.deals else None,
         proton_db=proton_vm,
     )
 

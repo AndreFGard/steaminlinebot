@@ -45,7 +45,7 @@ class ITADDeal(_ITADModel):
     store_low: ITADPrice | None = None
     deal_flag: ITADDealFlag | None = None
     expiry: datetime.datetime | None = None
-
+    url: str
 
 class ITADPriceOverview(_ITADModel):
     id: str
@@ -80,9 +80,9 @@ class IITADClient(ABC):
         ...
 
     @abstractmethod
-    async def lookup_by_steam_shopid(
+    async def lookup_by_steam_appid(
         self, game_ids: list[int]
-    ) -> dict[int, str | None]:
+    ) -> list[ITADGameId | None]:
         """Map Steam app ids to ITAD game ids."""
         ...
 
@@ -140,9 +140,9 @@ class ITADClient(IITADClient):
 
         return [ITADShop.model_validate(shop) for shop in await res.json()]
 
-    async def lookup_by_steam_shopid(
+    async def lookup_by_steam_appid(
         self, game_ids: list[int]
-    ) -> dict[int, str | None]:
+    ) -> list[ITADGameId | None]:
         """Map Steam app ids to ITAD game ids.
 
         Only supports Steam because it requires the ``app/<id>`` syntax.
@@ -155,4 +155,8 @@ class ITADClient(IITADClient):
         lookup = await res.json()
 
         # app/220 -> 220: ITAD game id.
-        return {int(game.split("/")[1]): itad_id for game, itad_id in lookup.items()}
+        map = {
+            int(game.split("/")[1]): ITADGameId(itad_id)
+            for game, itad_id in lookup.items()
+        }
+        return [map.get(appid) for appid in game_ids]

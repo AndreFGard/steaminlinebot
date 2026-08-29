@@ -114,7 +114,7 @@ class LowestPriceInPeriod_(enum.Enum):
 historical_low_table = sql.Table(
     "historical_low",
     metadata,
-    sql.Column("id", sql.Integer, primary_key=True),
+    sql.Column("id", sql.Integer, primary_key=True,autoincrement=True),
     sql.Column("game_id", sql.Integer, sql.ForeignKey("game.id"), nullable=False),
     sql.Column(
         "country_alpha2",
