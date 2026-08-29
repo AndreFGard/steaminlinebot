@@ -1,9 +1,9 @@
 import asyncio
 import logging
-from dataclasses import dataclass
 from abc import ABC, abstractmethod
 import traceback
 from typing import Optional
+
 
 from steaminlinebot.database.game_repository import IGameRepository
 from steaminlinebot.game import core
@@ -14,32 +14,10 @@ from steaminlinebot.game.core import (
     LowestPriceInPeriod,
     ScrapedCost,
 )
-from steaminlinebot.game.protondb_report import ProtonDBTier
 from steaminlinebot.integration import itad_client
 from steaminlinebot.integration.itad_client import IITADClient
 from steaminlinebot.integration.steam_client import ISteamClient
 
-
-@dataclass
-class ProtonDBVM:
-    tier: ProtonDBTier
-    positive_trend: bool
-    total_reports: int
-    appid: str
-
-
-@dataclass
-class GameResultVM:
-    """View Model"""
-
-    id: int
-    link: str
-    title: str
-    appid: str
-    price: Optional[str]
-    is_free: bool
-    discount: Optional[int]
-    proton_db: Optional[ProtonDBVM]
 
 
 class IGameSearcherService(ABC):

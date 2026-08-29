@@ -29,7 +29,7 @@ class ProtonDBTier(IntEnum):
     def from_int(cls, tier: int):
         return cls(tier)
 
-
+#TODO move to core?
 class ProtonDBReport(pydantic.BaseModel):
     game_id: int
     best_reported_tier: ProtonDBTier
