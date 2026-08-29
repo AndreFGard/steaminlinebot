@@ -114,4 +114,3 @@ def init_db(database_url: str) -> Engine:
             )
 
     return engine
-

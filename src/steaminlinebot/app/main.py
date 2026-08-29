@@ -88,9 +88,16 @@ async def main():
 
         user_repo = UserRepository(db)
         user_country = UserCountry(user_repo=user_repo)
+
+        STEAM_SHOP_ID = 61
+        itad_key = os.environ.get("ITAD_KEY")
+        assert itad_key is not None
+        itad = ITADClient(itad_key, steam_shop_id=STEAM_SHOP_ID, session=session)
+
         search_games = GameSearchService(
             client=steam_client,
-            game_result_repo=game_result_repo,
+            game_repo=game_result_repo,
+            itad_client=itad,
         )
         presenter = TelegramPresenter()
         game_searcher = GameSearchUsecase(
@@ -103,11 +110,6 @@ async def main():
             presenter=presenter,
             game_searcher=game_searcher,
         )
-
-        STEAM_SHOP_ID = 61
-        itad_key = os.environ.get("ITAD_KEY")
-        assert itad_key is not None
-        itad = ITADClient(itad_key, steam_shop_id=STEAM_SHOP_ID, session=session)
 
         application = Application.builder().token(token).build()
 
@@ -145,3 +147,7 @@ async def main():
 
 def run():
     asyncio.run(main())
+
+
+if __name__ == "__main__":
+    run()

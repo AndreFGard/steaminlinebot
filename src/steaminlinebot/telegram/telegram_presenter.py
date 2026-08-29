@@ -1,9 +1,13 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from decimal import Decimal
 from enum import Enum
 from typing import Optional
 from uuid import uuid4
 
+import babel
+import babel.numbers
+import pydantic
 from telegram import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -14,11 +18,30 @@ from telegram import (
 
 from steaminlinebot.game import core
 from steaminlinebot.game.game_search_usecase import GameSearchResult
-from steaminlinebot.game.game_searcher_service import (
-    GameResultVM,
-    ProtonDBVM,
-)
+from steaminlinebot.game.protondb_report import ProtonDBTier
 from steaminlinebot.user.user_country import CountryConfig, CountryModification
+
+
+@dataclass
+class ProtonDBVM:
+    tier: ProtonDBTier
+    positive_trend: bool
+    total_reports: int
+    appid: str
+
+
+class GameResultVM(pydantic.BaseModel):
+    """View Model"""
+
+    id: int
+    link: str
+    title: str
+    appid: str
+    historical_price_info: str
+    price: Optional[str]
+    is_free: bool
+    discount: Optional[int]
+    proton_db: Optional[ProtonDBVM]
 
 
 class SpecialResults(Enum):
@@ -54,12 +77,7 @@ class TelegramInlineResultListPres:
 
 
 class ITelegramPresenter(ABC):
-    """Builds Telegram API objects from domain view models.
-
-    This is the inversion boundary: domain/services speak in view models,
-    the presenter translates them into Telegram API objects.
-    Mock this interface to test handlers without Telegram API objects.
-    """
+    """Builds Telegram API objects from domain models, using a view model."""
 
     @abstractmethod
     def make_inline_query_presentation(
@@ -82,17 +100,29 @@ class ITelegramPresenter(ABC):
     ) -> TelegramCountryPres: ...
 
 
-def MakeSetCurrencyCallback(country_code: str) -> str:
+def make_set_currency_callback(country_code: str) -> str:
     return f"setcurrency {country_code}"
 
 
+def format_price_into_str(price_minor: int, currency_3l: str):
+    precision = babel.numbers.get_currency_precision(currency_3l)
+    value = Decimal(price_minor) / 10**precision
+    return babel.numbers.format_currency(value, currency_3l)
+
+
+# TODO add support to multiple deals
 def _gameresult_to_gameresultvm(game: core.SourcedGame) -> GameResultVM:
     # TODO see what code will be responsible for price formatting
+    deal = game.deals[0] if game.deals else None
     price = (
         None
-        if not game.cost
-        else f"{game.cost.value_minor} {game.cost.currency_3l} ({game.cost.country_l2})"
+        if deal is None
+        else format_price_into_str(deal.value_minor, deal.currency_3l)
     )
+
+    historical_price_info = ""
+    if game.price_overview is not None:
+        historical_price_info = f"Lowest price ever: {format_price_into_str(game.price_overview.lowest_value_minor, game.price_overview.currency_3l)}"
 
     if game.proton_db_info:
         proton_vm = ProtonDBVM(
@@ -110,8 +140,9 @@ def _gameresult_to_gameresultvm(game: core.SourcedGame) -> GameResultVM:
         title=game.game.title,
         appid=game.external_id,
         price=price,
-        is_free=game.cost.full_value_minor == 0 if game.cost else False,
-        discount=game.cost.discount if game.cost else None,
+        historical_price_info=historical_price_info,
+        is_free=deal.full_value_minor == 0 if deal is not None else False,
+        discount=deal.discount if deal is not None else None,
         proton_db=proton_vm,
     )
 
@@ -144,13 +175,15 @@ class TelegramPresenter(ITelegramPresenter):
 
     def _present_game_result_vm(self, game: GameResultVM) -> str:
         price = self._game_price_line(game)
-        discount = f"\t\\[-{game.discount}%]" if game.discount is not None else ""
+        discount = f"\t\\[-{game.discount}%]" if game.discount else ""
 
         return (
             f"[{game.title}]({game.link})"
             + "\n"
             + price
             + discount
+            + "\n"
+            + game.historical_price_info
             + "\n"
             + self._present_proton_db_vm(game.proton_db)
         )
@@ -254,7 +287,9 @@ class TelegramPresenter(ITelegramPresenter):
         keyboard: list[list[InlineKeyboardButton]] = []
         for i in range(0, len(codes), 3):
             row = [
-                InlineKeyboardButton(code, callback_data=MakeSetCurrencyCallback(code))
+                InlineKeyboardButton(
+                    code, callback_data=make_set_currency_callback(code)
+                )
                 for code in codes[i : i + 3]
             ]
             keyboard.append(row)

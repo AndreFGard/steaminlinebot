@@ -7,6 +7,7 @@ from steaminlinebot.database.schema import (
     country_table,
     game_external_id_table,
     game_source_table,
+    historical_low_table,
     metadata,
 )
 from steaminlinebot.database.game_repository import (
@@ -17,10 +18,10 @@ from steaminlinebot.game.core import (
     ProductType,
     GameSource,
     Game,
-    ScrapedSteamGame,
-    ScrapedCost,
     SourcedGame,
-    CostData,
+    GameDeal,
+    HistoricalPriceData,
+    LowestPriceInPeriod,
 )
 from steaminlinebot.game.protondb_report import ProtonDBReport, ProtonDBTier
 from steaminlinebot.integration.protondb_client import ScrapedProtonDBReport
@@ -47,39 +48,39 @@ def _seed_source(
         )
 
 
-def _make_game(
-    appid: str = "730",
-    link: str = "https://store.steampowered.com/app/730/",
-    title: str = "Counter-Strike",
-    cost: ScrapedCost | None = None,
-    is_free: bool = False,
-    proton_db_report: ScrapedProtonDBReport | None = None,
-    product_type: str = "game",
-) -> ScrapedSteamGame:
-    return ScrapedSteamGame(
-        link=link,
-        title=title,
-        appid=appid,
-        cost=cost,
-        is_free=is_free,
-        proton_db_report=proton_db_report,
-        product_type=ProductType(product_type),
-    )
-
-
-def _make_cost(
+def _make_deal(
     value_minor: int = 999,
     currency_3l: str = "USD",
     full_value_minor: int = 1999,
     discount: int = 50,
     country_l2: str = "US",
-) -> ScrapedCost:
-    return ScrapedCost(
+    price_expires_at=None,
+    observed_date=None,
+    historical_deal=None,
+) -> GameDeal:
+    return GameDeal(
         value_minor=value_minor,
         currency_3l=currency_3l,
         full_value_minor=full_value_minor,
         discount=discount,
         country_l2=country_l2,
+        price_expires_at=price_expires_at,
+        observed_date=observed_date,
+        historical_deal=historical_deal,
+    )
+
+
+def _make_price_overview(
+    scope: LowestPriceInPeriod = LowestPriceInPeriod.ALL,
+    lowest_value_minor: int = 500,
+    country_l2: str = "US",
+    currency_3l: str = "USD",
+) -> HistoricalPriceData:
+    return HistoricalPriceData(
+        scope=scope,
+        lowest_value_minor=lowest_value_minor,
+        country_l2=country_l2,
+        currency_3l=currency_3l,
     )
 
 
@@ -98,6 +99,33 @@ def _make_report(
         tier=tier,
         total=total,
         trending_tier=trending_tier,
+    )
+
+
+def _insert_full_game(
+    repo: GameRepository,
+    *,
+    title: str = "Counter-Strike",
+    product_type: ProductType = ProductType.GAME,
+    external_id: str = "730",
+    url: str = "https://store.steampowered.com/app/730/",
+    deals: Optional[list[GameDeal]] = None,
+    game_source: GameSource = GameSource.STEAM,
+    price_overview: Optional[HistoricalPriceData] = None,
+    proton_db_report: Optional[ScrapedProtonDBReport] = None,
+) -> SourcedGame:
+    """Insert a game through the public repository API with sensible defaults."""
+    if deals is None:
+        deals = [_make_deal()]
+    return repo.insert_full_game(
+        title=title,
+        product_type=product_type,
+        external_id=external_id,
+        url=url,
+        deals=deals,
+        game_source=game_source,
+        price_overview=price_overview,
+        proton_db_report=proton_db_report,
     )
 
 
@@ -135,36 +163,32 @@ def assert_model_equal(actual, expected, msg: str = ""):
 
 
 class TestInsertFullGame:
-    """Happy-path: game with cost + ProtonDB report."""
+    """Happy-path: game with a deal + ProtonDB report."""
 
     def test_returns_correct_fields(self):
         engine = _setup_engine()
         repo = GameRepository(engine)
 
-        result = repo.insert_game_result(
-            _make_game(
-                cost=_make_cost(),
-                proton_db_report=_make_report(),
-            ),
-            game_source=GameSource.STEAM,
-        )
+        result = _insert_full_game(repo, proton_db_report=_make_report())
 
         expected = SourcedGame(
             game=Game(id=0, title="Counter-Strike", product_type=ProductType.GAME),
             external_id="730",
             game_source=GameSource.STEAM,
-            cost=CostData(
-                id=0,  # stripped
-                value_minor=999,
-                currency_3l="USD",
-                full_value_minor=1999,
-                discount=50,
-                country_l2="US",
-                price_expires_at=None,
-                observed_date=None,
-                historical_deal=None,
-            ),
+            deals=[
+                GameDeal(
+                    value_minor=999,
+                    currency_3l="USD",
+                    full_value_minor=1999,
+                    discount=50,
+                    country_l2="US",
+                    price_expires_at=None,
+                    observed_date=None,
+                    historical_deal=None,
+                )
+            ],
             url="https://store.steampowered.com/app/730/",
+            price_overview=None,
             proton_db_info=ProtonDBReport(
                 game_id=0,  # stripped
                 best_reported_tier=ProtonDBTier.GOLD,
@@ -179,37 +203,28 @@ class TestInsertFullGame:
         assert_model_equal(result, expected)
 
     def test_ids_are_populated(self):
-        """The canonical game id, cost.id, and proton_db_info.game_id are set."""
+        """The canonical game id is set and the proton report references it."""
         engine = _setup_engine()
         repo = GameRepository(engine)
 
-        result = repo.insert_game_result(
-            _make_game(
-                cost=_make_cost(),
-                proton_db_report=_make_report(),
-            ),
-            game_source=GameSource.STEAM,
-        )
+        result = _insert_full_game(repo, proton_db_report=_make_report())
 
         assert isinstance(result.game.id, int) and result.game.id > 0
-        assert result.cost is not None and result.cost.id > 0
+        assert result.deals, "expected at least one deal"
         assert result.proton_db_info is not None and result.proton_db_info.game_id > 0
         assert result.proton_db_info.game_id == result.game.id
 
 
-class TestFreeGame:
-    """Game without cost data."""
+class TestNoDeals:
+    """Game without any deal data."""
 
-    def test_cost_is_none(self):
+    def test_deals_is_empty_list(self):
         engine = _setup_engine()
         repo = GameRepository(engine)
 
-        result = repo.insert_game_result(
-            _make_game(cost=None, proton_db_report=_make_report()),
-            game_source=GameSource.STEAM,
-        )
+        result = _insert_full_game(repo, deals=[], proton_db_report=_make_report())
 
-        assert result.cost is None
+        assert result.deals == []
         assert result.proton_db_info is not None
 
 
@@ -220,35 +235,29 @@ class TestMissingProtonReport:
         engine = _setup_engine()
         repo = GameRepository(engine)
 
-        result = repo.insert_game_result(
-            _make_game(cost=_make_cost(), proton_db_report=None),
-            game_source=GameSource.STEAM,
-        )
+        result = _insert_full_game(repo, proton_db_report=None)
 
-        assert result.cost is not None
+        assert result.deals
         assert result.proton_db_info is None
 
 
 class TestDuplicateAppid:
-    """Inserting the same (source, appid) twice re-uses the game row."""
+    """Inserting the same (source, external_id) twice re-uses the game row."""
 
     def test_second_insert_reuses_game_id(self):
         engine = _setup_engine()
         repo = GameRepository(engine)
 
-        first = repo.insert_game_result(
-            _make_game(appid="440", cost=_make_cost()),
-            game_source=GameSource.STEAM,
-        )
-        second = repo.insert_game_result(
-            _make_game(appid="440", cost=_make_cost(value_minor=499)),
-            game_source=GameSource.STEAM,
+        first = _insert_full_game(repo, external_id="440", deals=[_make_deal()])
+        second = _insert_full_game(
+            repo, external_id="440", deals=[_make_deal(value_minor=499)]
         )
 
         # Same game row, two different cost observations
         assert second.game.id == first.game.id
-        assert second.cost is not None and second.cost.id != first.cost.id  # type: ignore[union-attr]
-        assert second.cost.value_minor == 499  # type: ignore[union-attr]
+        assert first.deals and second.deals
+        assert second.deals[0].value_minor == 499
+        assert first.deals[0].value_minor != second.deals[0].value_minor
 
 
 class TestDifferentSources:
@@ -259,14 +268,8 @@ class TestDifferentSources:
         _seed_source(engine, "ITAD")
         repo = GameRepository(engine)
 
-        steam = repo.insert_game_result(
-            _make_game(appid="123", cost=_make_cost()),
-            game_source=GameSource.STEAM,
-        )
-        itad = repo.insert_game_result(
-            _make_game(appid="123", cost=_make_cost()),
-            game_source=GameSource.ITAD,
-        )
+        steam = _insert_full_game(repo, external_id="123")
+        itad = _insert_full_game(repo, external_id="123", game_source=GameSource.ITAD)
 
         assert steam.game.id != itad.game.id
         assert steam.game_source == GameSource.STEAM
@@ -279,7 +282,7 @@ class TestSourceNotFound:
         repo = GameRepository(engine)
 
         with pytest.raises(SourceNotFoundError, match="ITAD"):
-            repo.insert_game_result(_make_game(), game_source=GameSource.ITAD)
+            _insert_full_game(repo, game_source=GameSource.ITAD)
 
 
 class TestProductType:
@@ -287,12 +290,101 @@ class TestProductType:
         engine = _setup_engine()
         repo = GameRepository(engine)
 
-        result = repo.insert_game_result(
-            _make_game(appid="999", product_type="dlc", cost=_make_cost()),
-            game_source=GameSource.STEAM,
+        result = _insert_full_game(
+            repo, external_id="999", product_type=ProductType.DLC
         )
 
         assert result.game.product_type == ProductType.DLC
+
+
+class TestInsertGame:
+    """The lighter-weight ``insert_game`` creates a linked game row."""
+
+    def test_returns_game_id_and_links_source(self):
+        engine = _setup_engine()
+        repo = GameRepository(engine)
+
+        game_id = repo.get_or_insert_game(
+            "Hollow Knight", ProductType.GAME, GameSource.STEAM, "367520"
+        )
+
+        assert isinstance(game_id, int) and game_id > 0
+        assert repo.get_game_id_on_source(game_id, GameSource.STEAM) == "367520"
+
+    def test_reuses_existing_game(self):
+        engine = _setup_engine()
+        repo = GameRepository(engine)
+
+        first = repo.get_or_insert_game(
+            "Hollow Knight", ProductType.GAME, GameSource.STEAM, "367520"
+        )
+        second = repo.get_or_insert_game(
+            "Hollow Knight", ProductType.GAME, GameSource.STEAM, "367520"
+        )
+
+        assert first == second
+
+
+class TestHistoricalLow:
+    """``price_overview`` is persisted into the historical_low table."""
+
+    def test_inserts_historical_low(self):
+        engine = _setup_engine()
+        repo = GameRepository(engine)
+
+        pov = _make_price_overview(
+            lowest_value_minor=500,
+            country_l2="US",
+            currency_3l="USD",
+            scope=LowestPriceInPeriod.ALL,
+        )
+        result = _insert_full_game(repo, external_id="730", price_overview=pov)
+
+        assert result.price_overview is pov
+
+        with engine.begin() as conn:
+            rows = conn.execute(historical_low_table.select()).fetchall()
+
+        assert len(rows) == 1
+        row = rows[0]
+        assert row.game_id == result.game.id
+        assert row.country_alpha2 == "US"
+        assert row.currency == "USD"
+        assert row.lowest_value_minor == 500
+        assert row.scope.value == "all"
+
+    def test_updates_historical_low(self):
+        engine = _setup_engine()
+        repo = GameRepository(engine)
+
+        pov = _make_price_overview(
+            lowest_value_minor=500,
+            country_l2="US",
+            currency_3l="USD",
+            scope=LowestPriceInPeriod.ALL,
+        )
+        result = _insert_full_game(repo, external_id="730", price_overview=pov)
+
+        pov = _make_price_overview(
+            lowest_value_minor=100,
+            country_l2="US",
+            currency_3l="USD",
+            scope=LowestPriceInPeriod.ALL,
+        )
+        result = _insert_full_game(repo, external_id="730", price_overview=pov)
+
+        assert result.price_overview is pov
+
+        with engine.begin() as conn:
+            rows = conn.execute(historical_low_table.select()).fetchall()
+
+        assert len(rows) == 1
+        row = rows[0]
+        assert row.game_id == result.game.id
+        assert row.country_alpha2 == "US"
+        assert row.currency == "USD"
+        assert row.lowest_value_minor == 100
+        assert row.scope.value == "all"
 
 
 class TestAddGameSource:
@@ -302,9 +394,7 @@ class TestAddGameSource:
         repo = GameRepository(engine)
 
         # Create the game through the public repository API.
-        sourced = repo.insert_game_result(
-            _make_game(appid="730"), game_source=GameSource.STEAM
-        )
+        sourced = _insert_full_game(repo, external_id="730")
 
         # Attach an additional (ITAD) source to the already-created game.
         repo.add_game_source(
@@ -328,9 +418,7 @@ class TestAddGameSource:
     def test_raises_when_source_missing(self):
         engine = _setup_engine()
         repo = GameRepository(engine)
-        sourced = repo.insert_game_result(
-            _make_game(appid="730"), game_source=GameSource.STEAM
-        )
+        sourced = _insert_full_game(repo, external_id="730")
 
         with pytest.raises(SourceNotFoundError, match="ITAD"):
             repo.add_game_source(
@@ -342,9 +430,7 @@ class TestGetGameSource:
     def test_gets_source_when_exists(self):
         engine = _setup_engine()
         repo = GameRepository(engine)
-        sourced = repo.insert_game_result(
-            _make_game(appid="730"), game_source=GameSource.STEAM
-        )
+        sourced = _insert_full_game(repo, external_id="730")
         external_id = repo.get_game_id_on_source(sourced.game.id, GameSource.STEAM)
 
         assert external_id == "730"
@@ -353,9 +439,7 @@ class TestGetGameSource:
         engine = _setup_engine()
         _seed_source(engine, "ITAD")
         repo = GameRepository(engine)
-        sourced = repo.insert_game_result(
-            _make_game(appid="730"), game_source=GameSource.STEAM
-        )
+        sourced = _insert_full_game(repo, external_id="730")
         repo.add_game_source(
             sourced.game.id,
             game_source=GameSource.ITAD,
@@ -370,12 +454,8 @@ class TestGetGameSource:
         engine = _setup_engine()
         repo = GameRepository(engine)
 
-        steam_a = repo.insert_game_result(
-            _make_game(appid="730"), game_source=GameSource.STEAM
-        )
-        steam_b = repo.insert_game_result(
-            _make_game(appid="999"), game_source=GameSource.STEAM
-        )
+        steam_a = _insert_full_game(repo, external_id="730")
+        steam_b = _insert_full_game(repo, external_id="999")
 
         ext_a = repo.get_game_id_on_source(steam_a.game.id, GameSource.STEAM)
         ext_b = repo.get_game_id_on_source(steam_b.game.id, GameSource.STEAM)

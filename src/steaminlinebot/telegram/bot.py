@@ -1,13 +1,20 @@
 import asyncio
 import logging
 import time
+import traceback
 from typing import Any, Callable, Coroutine, Mapping
 
 from telegram import Update
 from telegram.ext import CallbackContext, InvalidCallbackData
 
-from steaminlinebot.game.game_search_usecase import IGameSearchUsecase, QueryTooShortError
-from steaminlinebot.telegram.telegram_presenter import ITelegramPresenter, SpecialResults
+from steaminlinebot.game.game_search_usecase import (
+    IGameSearchUsecase,
+    QueryTooShortError,
+)
+from steaminlinebot.telegram.telegram_presenter import (
+    ITelegramPresenter,
+    SpecialResults,
+)
 from steaminlinebot.user.user_country import IUserCountry
 
 
@@ -52,6 +59,9 @@ class Bot:
             presentation = self._presenter.make_error_presentation(
                 SpecialResults.QUERY_TOO_SHORT
             )
+        except Exception:
+            traceback.print_exc()
+            presentation = self._presenter.make_error_presentation(SpecialResults.ERROR)
 
         await update.inline_query.answer(
             presentation.results, cache_time=30, button=presentation.button
@@ -80,7 +90,7 @@ class Bot:
         result = await self._user_country.set_country(
             user_id,
             requested_country=context.args[0] if context.args else "",
-            user_lang_2l=message.from_user.language_code,
+            lang_2l_or_ietf=message.from_user.language_code,
         )
         presentation = self._presenter.make_currency_message_from_country(
             result.modification, result.suggestions

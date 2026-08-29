@@ -27,8 +27,7 @@ class HistoricalDeal(enum.Enum):
     STORE_LOW = "S"
 
 
-class CostData(pydantic.BaseModel):
-    id: int
+class GameDeal(pydantic.BaseModel):
     value_minor: int
     currency_3l: str
     full_value_minor: int
@@ -62,8 +61,7 @@ class LowestPriceInPeriod(enum.Enum):
 
 
 # TODO: this class is in the DB, but not yet wired in.
-class HistoricPriceOverview:
-    game_id: int
+class HistoricalPriceData(pydantic.BaseModel):
     scope: LowestPriceInPeriod
     lowest_value_minor: int
     country_l2: str
@@ -80,7 +78,7 @@ class ScrapedCost(pydantic.BaseModel):
     country_l2: str
 
 
-# TODO does not belong here.
+# TODO break this down into a repository DTO, or destroy it altogether.
 class ScrapedSteamGame(pydantic.BaseModel):
     """Steam scraping result"""
 
@@ -98,7 +96,8 @@ class SourcedGame(pydantic.BaseModel):
     game: Game
     external_id: str
     game_source: GameSource
-    cost: Optional[CostData]
+    deals: list[GameDeal]
     url: str
+    price_overview: Optional[HistoricalPriceData]
     """Only exists for games available on steam"""
     proton_db_info: Optional[ProtonDBReport]

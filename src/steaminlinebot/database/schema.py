@@ -2,6 +2,8 @@ import enum
 
 import sqlalchemy as sql
 
+from steaminlinebot.game.core import LowestPriceInPeriod
+
 metadata = sql.MetaData()
 
 
@@ -104,25 +106,18 @@ cost_table = sql.Table(
 )
 
 
-class LowestPriceInPeriod_(enum.Enum):
-    ALL = "all"
-    YEAR = "y1"
-    QUARTER = "m3"
-
-
 # Aggregator-provided historical low prices (e.g. ITAD), NOT derived from the `cost` table.
 historical_low_table = sql.Table(
     "historical_low",
     metadata,
-    sql.Column("id", sql.Integer, primary_key=True),
-    sql.Column("game_id", sql.Integer, sql.ForeignKey("game.id"), nullable=False),
+    sql.Column("game_id", sql.Integer, sql.ForeignKey("game.id"), primary_key=True),
     sql.Column(
         "country_alpha2",
         sql.String(2),
         sql.ForeignKey("country.alpha2"),
-        nullable=False,
+        primary_key=True,
     ),
-    sql.Column("scope", sql.Enum(LowestPriceInPeriod_)),
+    sql.Column("scope", sql.Enum(LowestPriceInPeriod), primary_key=True),
     sql.Column("currency", sql.String(3), nullable=False),
     sql.Column("lowest_value_minor", sql.Integer, nullable=False),
     # date when was collected from an external source.

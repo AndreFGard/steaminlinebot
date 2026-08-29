@@ -46,32 +46,22 @@ class IUserCountry(ABC):
 
     @abstractmethod
     async def set_country(
-        self, user_id: int, requested_country: str, user_lang_2l: Optional[str] = None
+        self,
+        user_id: int,
+        requested_country: str,
+        lang_2l_or_ietf: Optional[str] = None,
     ) -> CountrySetResult: ...
 
     @abstractmethod
-    async def suggest_countries(self, lang_2l: Optional[str]) -> list[str]:
+    async def suggest_countries(self, lang_2l_or_ietf: Optional[str]) -> list[str]:
         """Returns a list of likely countries for the user, based on a language-only tag, or None."""
         ...
 
 
+# TODO business logic is all over, must rewrite.
 class UserCountry(IUserCountry):
     def __init__(self, user_repo: IUserRepository):
         self._user_repo = user_repo
-
-    async def get_country_by_language_2l(self, language_2l: str):
-        if len(language_2l) != 2:
-            raise ValueError(
-                f"language_2l must be a 2-letter code, got '{language_2l}'"
-            )
-        return self._user_repo.get_country_by_language(language_2l)
-
-    async def get_country_by_language_etf(self, language_etf: str):
-        if len(language_etf) != 2:
-            raise ValueError(
-                f"language_2l must be a 2-letter code, got '{language_etf}'"
-            )
-        return self._user_repo.get_country_by_language(language_etf)
 
     async def resolve_country(
         self, user_id: int, fallback_user_language_etf: Optional[str]
@@ -81,21 +71,23 @@ class UserCountry(IUserCountry):
 
         if not country:
             has_set = False
-            # TODO: language→country inference is a naive prefix match. A better approach would use a proper locale -> country to avoid bad guesses.
+            # TODO: language→country inference is a naive prefix match. A better
+            # approach would use a proper locale -> country to avoid bad guesses.
             if not fallback_user_language_etf:
                 fallback_user_language_etf = _DEFAULT_FALLBACK_LANGUAGE_ETF
-            country = await self.get_country_by_language_2l(
-                fallback_user_language_etf.split("-")[0]
-            )
+            country = (await self.suggest_countries(fallback_user_language_etf))[0]
 
         if not country:
             country = _DEFAULT_COUNTRY
         return CountryConfig(country=country, has_configured=has_set)
 
     async def set_country(
-        self, user_id: int, requested_country: str, user_lang_2l: Optional[str] = None
+        self,
+        user_id: int,
+        requested_country: str,
+        lang_2l_or_ietf: Optional[str] = None,
     ) -> CountrySetResult:
-        suggestions = await self.suggest_countries(user_lang_2l)
+        suggestions = await self.suggest_countries(lang_2l_or_ietf)
 
         if not requested_country:
             return CountrySetResult(modification=None, suggestions=suggestions)
@@ -121,16 +113,20 @@ class UserCountry(IUserCountry):
 
         return CountrySetResult(modification=modification, suggestions=suggestions)
 
-    async def suggest_countries(self, lang_2l: Optional[str]) -> list[str]:
-        if not lang_2l:
+    async def suggest_countries(self, lang_2l_or_ietf: Optional[str]) -> list[str]:
+        if not lang_2l_or_ietf:
             logging.warning("Suggesting default-based language")
-            lang_2l = _DEFAULT_LANGUAGE
+            lang_2l_or_ietf = _DEFAULT_LANGUAGE
 
-        language_inferred_country = await self.get_country_by_language_2l(lang_2l)
-        suggested_country_codes = list(_POPULAR_COUNTRY_CODES)
+        language_inferred_country = None
+        if lang_2l_or_ietf is not None and len(lang_2l_or_ietf) == 4:
+            # TODO  validate user country
+            language_inferred_country = lang_2l_or_ietf.split("-")[1].upper()
+
+        suggested_country_codes = list(reversed(_POPULAR_COUNTRY_CODES))
         if language_inferred_country:
             suggested_country_codes.append(language_inferred_country)
-        # inferred appears earlier; preserve order while deduplicating.
+        # deduplicate without reordering.
         suggested_country_codes = list(dict.fromkeys(reversed(suggested_country_codes)))
 
         return suggested_country_codes
