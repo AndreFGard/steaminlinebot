@@ -86,12 +86,14 @@ def MakeSetCurrencyCallback(country_code: str) -> str:
     return f"setcurrency {country_code}"
 
 
+# TODO add support to multiple deals
 def _gameresult_to_gameresultvm(game: core.SourcedGame) -> GameResultVM:
     # TODO see what code will be responsible for price formatting
+    deal = game.deals[0] if game.deals else None
     price = (
         None
-        if not game.deals
-        else f"{game.deals.value_minor} {game.deals.currency_3l} ({game.deals.country_l2})"
+        if deal is None
+        else f"{deal.value_minor} {deal.currency_3l} ({deal.country_l2})"
     )
 
     if game.proton_db_info:
@@ -110,8 +112,8 @@ def _gameresult_to_gameresultvm(game: core.SourcedGame) -> GameResultVM:
         title=game.game.title,
         appid=game.external_id,
         price=price,
-        is_free=game.deals.full_value_minor == 0 if game.deals else False,
-        discount=game.deals.discount if game.deals else None,
+        is_free=deal.full_value_minor == 0 if deal is not None else False,
+        discount=deal.discount if deal is not None else None,
         proton_db=proton_vm,
     )
 

@@ -2,6 +2,7 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
+import traceback
 from typing import Optional
 
 from steaminlinebot.database.game_repository import IGameRepository
@@ -57,17 +58,20 @@ async def _get_itad_prices(
 ) -> dict[int, itad_client.ITADPriceOverview | None]:
     """Map Steam app ids to their ITAD price overview (or None).
     """
-    itad_ids = await itad_client.lookup_by_steam_appid(steam_appids)
-    requested = [game_id for game_id in itad_ids if game_id is not None]
-    fetched = await itad_client.get_prices(requested, country_2l)
+    try:
+        itad_ids = await itad_client.lookup_by_steam_appid(steam_appids)
+        requested = [game_id for game_id in itad_ids if game_id is not None]
+        fetched = await itad_client.get_prices(requested, country_2l)
 
-    by_id = dict(zip(requested, fetched))
+        by_id = dict(zip(requested, fetched))
 
-    return {
-        appid: (by_id.get(itad_id) if itad_id is not None else None)
-        for appid, itad_id in zip(steam_appids, itad_ids)
-    }
-
+        return {
+            appid: (by_id.get(itad_id) if itad_id is not None else None)
+            for appid, itad_id in zip(steam_appids, itad_ids)
+        }
+    except Exception:
+        return {}
+        traceback.print_exc()
 
 def _steam_cost_to_deal(cost: ScrapedCost) -> GameDeal:
     return GameDeal(
