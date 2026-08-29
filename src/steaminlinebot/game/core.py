@@ -62,7 +62,6 @@ class LowestPriceInPeriod(enum.Enum):
 
 # TODO: this class is in the DB, but not yet wired in.
 class HistoricalPriceData(pydantic.BaseModel):
-    game_id: int
     scope: LowestPriceInPeriod
     lowest_value_minor: int
     country_l2: str

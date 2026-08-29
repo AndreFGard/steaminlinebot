@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import time
+import traceback
 from typing import Any, Callable, Coroutine, Mapping
 
 from telegram import Update
@@ -52,6 +53,9 @@ class Bot:
             presentation = self._presenter.make_error_presentation(
                 SpecialResults.QUERY_TOO_SHORT
             )
+        except Exception:
+            traceback.print_exc()
+            presentation = self._presenter.make_error_presentation(SpecialResults.ERROR)
 
         await update.inline_query.answer(
             presentation.results, cache_time=30, button=presentation.button

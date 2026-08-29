@@ -20,7 +20,7 @@ class _ITADModel(pydantic.BaseModel):
 class ITADPrice(_ITADModel):
     amount: float
     amount_int: int = pydantic.Field(alias="amountInt")
-    currency_3l: str
+    currency_3l: str =pydantic.Field(alias="currency")
 
 
 class ITADHistoricalLowInfo(_ITADModel):
@@ -35,32 +35,32 @@ class ITADDealFlag(Enum):
     StoreLow = "S"
 
 
+class ITADShop(_ITADModel):
+    name: str
+    id: ITADShopId
+
+
 class ITADDeal(_ITADModel):
-    shop_id: int
-    shop_name: str
+    shop: ITADShop
     price: ITADPrice
     regular: ITADPrice
     cut: int
     """Integer 0-100."""
-    store_low: ITADPrice | None = None
-    deal_flag: ITADDealFlag | None = None
+    store_low: ITADPrice | None = pydantic.Field(alias="storeLow", default=None)
+    deal_flag: ITADDealFlag | None = pydantic.Field(alias="flag", default=None)
     expiry: datetime.datetime | None = None
     url: str
 
+
 class ITADPriceOverview(_ITADModel):
     id: str
-    historical_low: ITADHistoricalLowInfo
+    historical_low: ITADHistoricalLowInfo = pydantic.Field(alias="historyLow")
     deals: list[ITADDeal]
 
 
 ITADGameId = NewType("ITADGameId", str)
 
 ITADShopId = NewType("ITADShopId", int)
-
-
-class ITADShop(_ITADModel):
-    title: str
-    id: ITADShopId
 
 
 class IITADClient(ABC):
@@ -110,7 +110,9 @@ class ITADClient(IITADClient):
     async def get_prices(
         self, game_ids: list[ITADGameId], country_2l: str
     ) -> list[ITADPriceOverview | None]:
-        res = await self._session.get(
+        assert len(game_ids) < 200
+
+        res = await self._session.post(
             _PRICES_URL,
             json=game_ids,
             headers=self._auth_headers,
@@ -118,19 +120,23 @@ class ITADClient(IITADClient):
         )
         await self._raise_for_status(res)
 
-        res_body: dict[str, object] = await res.json()
+        body: list = await res.json()
 
         overviews: dict[ITADGameId, ITADPriceOverview | None] = {
             game_id: None for game_id in game_ids
         }
 
-        for game_id, price_overview_json in res_body.items():
+        for game_response in body:
             try:
-                overviews[ITADGameId(game_id)] = ITADPriceOverview.model_validate(
-                    price_overview_json
+                overviews[ITADGameId(game_response["id"])] = (
+                    ITADPriceOverview.model_validate(game_response)
                 )
             except pydantic.ValidationError as e:
-                log.error("Invalid ITAD price overview for %s: %s", game_id, e)
+                log.error(
+                    "Invalid ITAD price overview for game '%s': %s",
+                    game_response.get("id"),
+                    e,
+                )
 
         return list(overviews.values())
 
@@ -152,11 +158,11 @@ class ITADClient(IITADClient):
         res = await self._session.post(url, json=body, headers=self._auth_headers)
         await self._raise_for_status(res)
 
-        lookup = await res.json()
+        body = await res.json()
 
         # app/220 -> 220: ITAD game id.
         map = {
             int(game.split("/")[1]): ITADGameId(itad_id)
-            for game, itad_id in lookup.items()
+            for game, itad_id in body.items()
         }
         return [map.get(appid) for appid in game_ids]

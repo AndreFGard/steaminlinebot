@@ -56,22 +56,18 @@ class IGameSearcherService(ABC):
 async def _get_itad_prices(
     itad_client: itad_client.IITADClient, steam_appids: list[int], country_2l: str
 ) -> dict[int, itad_client.ITADPriceOverview | None]:
-    """Map Steam app ids to their ITAD price overview (or None).
-    """
-    try:
-        itad_ids = await itad_client.lookup_by_steam_appid(steam_appids)
-        requested = [game_id for game_id in itad_ids if game_id is not None]
-        fetched = await itad_client.get_prices(requested, country_2l)
+    """Map Steam app ids to their ITAD price overview (or None)."""
+    itad_ids = await itad_client.lookup_by_steam_appid(steam_appids)
+    requested = [game_id for game_id in itad_ids if game_id is not None]
+    fetched = await itad_client.get_prices(requested, country_2l)
 
-        by_id = dict(zip(requested, fetched))
+    by_id = dict(zip(requested, fetched))
 
-        return {
-            appid: (by_id.get(itad_id) if itad_id is not None else None)
-            for appid, itad_id in zip(steam_appids, itad_ids)
-        }
-    except Exception:
-        return {}
-        traceback.print_exc()
+    return {
+        appid: (by_id.get(itad_id) if itad_id is not None else None)
+        for appid, itad_id in zip(steam_appids, itad_ids)
+    }
+
 
 def _steam_cost_to_deal(cost: ScrapedCost) -> GameDeal:
     return GameDeal(
@@ -84,6 +80,22 @@ def _steam_cost_to_deal(cost: ScrapedCost) -> GameDeal:
         observed_date=None,
         historical_deal=None,
     )
+
+
+def _itad_overview_to_historical_price(
+    price_overview: itad_client.ITADPriceOverview, country_2l: str
+):
+    return (
+        HistoricalPriceData(
+            scope=LowestPriceInPeriod.ALL,
+            lowest_value_minor=price_overview.historical_low.all.amount_int,
+            currency_3l=price_overview.historical_low.all.currency_3l,
+            country_l2=country_2l,
+        )
+        if price_overview is not None and price_overview.historical_low.all is not None
+        else None
+    )
+
 
 class GameSearchService(IGameSearcherService):
     def __init__(
@@ -117,9 +129,15 @@ class GameSearchService(IGameSearcherService):
             if game.product_type.value not in self._DESIRED_PRODUCT_TYPES:
                 continue
             try:
-                deals = [_steam_cost_to_deal(game.cost)] if game.cost is not None else []
-                overview = itad_by_appid.get(int(game.appid))
-                price_overview = None
+                deals = (
+                    [_steam_cost_to_deal(game.cost)] if game.cost is not None else []
+                )
+                itad_overview = itad_by_appid.get(int(game.appid))
+                historical_price = (
+                    _itad_overview_to_historical_price(itad_overview, country_code)
+                    if itad_overview is not None
+                    else None
+                )
 
                 game_result = self._game_repo.insert_full_game(
                     title=game.title,
@@ -128,12 +146,13 @@ class GameSearchService(IGameSearcherService):
                     url=game.link,
                     deals=deals,
                     game_source=GameSource.STEAM,
-                    price_overview=price_overview,
+                    price_overview=historical_price,
                     proton_db_report=game.proton_db_report,
                 )
 
                 results.append(game_result)
             except Exception as e:
+                traceback.print_exc()
                 logging.info(f"Error at search_game when building Result: {e}")
 
         return results
