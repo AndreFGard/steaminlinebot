@@ -1,7 +1,6 @@
-import enum
 import datetime
+import enum
 from typing import Optional
-
 
 import pydantic
 
@@ -31,17 +30,20 @@ class GameDeal(pydantic.BaseModel):
     value_minor: int
     currency_3l: str
     full_value_minor: int
-    """Represented as 4 decimals (99.99 -> 9999)"""
+    """Follows the standardized currency representation"""
     discount: int
     country_l2: Optional[str]
     price_expires_at: Optional[datetime.datetime]
     observed_date: Optional[datetime.datetime]
+    # TODO change for historical deal again
     """If the current price is a historical low or not"""
-    historical_deal: Optional[HistoricalDeal]
+    historical_deal: Optional[LowestPriceInPeriod]
+    url: str
+    source_shop: str
 
 
-class GameSource(enum.Enum):
-    """GameIndex represents any game index system, not to be confused with a shop. Can be used to translate internal -> external id"""
+class COMMON_GAME_SOURCE_NAMES(enum.Enum):
+    """Non exhaustive list of supported game sources. The name must be the same that ITAD uses"""
 
     STEAM = "Steam"
     ITAD = "ITAD"
@@ -95,8 +97,9 @@ class ScrapedSteamGame(pydantic.BaseModel):
 class SourcedGame(pydantic.BaseModel):
     game: Game
     external_id: str
-    game_source: GameSource
-    deals: list[GameDeal]
+    game_source: COMMON_GAME_SOURCE_NAMES
+    main_deal: Optional[GameDeal]
+    other_deals: list[GameDeal]
     url: str
     price_overview: Optional[HistoricalPriceData]
     """Only exists for games available on steam"""

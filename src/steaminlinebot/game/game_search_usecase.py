@@ -41,7 +41,7 @@ class GameSearchUsecase(IGameSearchUsecase):
         country_config = await self.user_country.resolve_country(user_id, user_lang_etf)
 
         search_results = await self.search_games.search_game(
-            query, country_code=country_config.country
+            query, country_2l=country_config.country
         )
 
         return GameSearchResult(

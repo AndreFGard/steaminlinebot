@@ -120,7 +120,7 @@ class ITADClient(IITADClient):
         )
         await self._raise_for_status(res)
 
-        body: list = await res.json()
+        body = await res.json()
 
         overviews: dict[ITADGameId, ITADPriceOverview | None] = {
             game_id: None for game_id in game_ids

@@ -1,8 +1,6 @@
-import enum
-
 import sqlalchemy as sql
 
-from steaminlinebot.game.core import LowestPriceInPeriod
+from steaminlinebot.game.core import LowestPriceInPeriod, ProductType
 
 metadata = sql.MetaData()
 
@@ -28,16 +26,6 @@ game_external_id_table = sql.Table(
 )
 
 
-class DBProductType(enum.Enum):
-    GAME = "game"
-    APPLICATION = "application"
-    TOOL = "tool"
-    DEMO = "demo"
-    DLC = "dlc"
-    MUSIC = "music"
-    MOD = "mod"
-
-
 game_table = sql.Table(
     "game",
     metadata,
@@ -45,17 +33,10 @@ game_table = sql.Table(
     sql.Column("title", sql.String(), nullable=False),
     sql.Column(
         "product_type",
-        sql.Enum(DBProductType),
-        default=DBProductType.GAME,
-        nullable=False,
+        sql.Enum(ProductType),
+        nullable=True,
     ),
 )
-
-
-class DealFlag_(enum.Enum):
-    HISTORICAL_LOW = "H"
-    NEW_HISTORICAL_LOW = "N"
-    STORE_LOW = "S"
 
 
 # One observation per poll per shop
@@ -64,7 +45,9 @@ cost_table = sql.Table(
     metadata,
     sql.Column("id", sql.Integer, primary_key=True, autoincrement=True),
     sql.Column("game_id", sql.Integer, sql.ForeignKey("game.id"), nullable=False),
-    sql.Column("source_id", sql.Integer, sql.ForeignKey("game_source.id")),
+    sql.Column(
+        "source_id", sql.Integer, sql.ForeignKey("game_source.id"), nullable=False
+    ),
     sql.Column("country_alpha2", sql.String(2), sql.ForeignKey("country.alpha2")),
     sql.Column("currency", sql.String(3), nullable=False),
     sql.Column(
@@ -81,7 +64,7 @@ cost_table = sql.Table(
     sql.Column("full_value_minor", sql.Integer, nullable=False),
     # percent with 4 decimals (99.99) -> 9999
     sql.Column("discount", sql.Integer, nullable=False),
-    sql.Column("flag", sql.Enum(DealFlag_)),  # H / N / S, or null
+    sql.Column("flag", sql.Enum(LowestPriceInPeriod)),  # H / N / S, or null
     sql.Column("price_expires_at", sql.DateTime()),
     sql.Column("url", sql.String()),
     sql.UniqueConstraint(

@@ -38,9 +38,8 @@ class GameResultVM(pydantic.BaseModel):
     title: str
     appid: str
     historical_price_info: str
-    price: Optional[str]
-    is_free: bool
-    discount: Optional[int]
+    price_line: str
+    description: str
     proton_db: Optional[ProtonDBVM]
 
 
@@ -67,11 +66,11 @@ class TelegramInlineArticlePres(TelegramPresentation):
 
 
 @dataclass
-class TelegramCountryPres(TelegramPresentation): ...
+class CountryPresentation(TelegramPresentation): ...
 
 
 @dataclass
-class TelegramInlineResultListPres:
+class InlineResultListPresentation:
     results: list[InlineQueryResultArticle]
     button: Optional[InlineQueryResultsButton]
 
@@ -83,12 +82,12 @@ class ITelegramPresenter(ABC):
     def make_inline_query_presentation(
         self,
         result: GameSearchResult,
-    ) -> "TelegramInlineResultListPres": ...
+    ) -> "InlineResultListPresentation": ...
 
     @abstractmethod
     def make_error_presentation(
         self, error: "SpecialResults"
-    ) -> "TelegramInlineResultListPres": ...
+    ) -> "InlineResultListPresentation": ...
 
     @abstractmethod
     def make_delete_confirmation(self, success: bool) -> "TelegramPresentation": ...
@@ -97,14 +96,14 @@ class ITelegramPresenter(ABC):
         self,
         country_mod: Optional[CountryModification],
         alternative_suggestions: list[str],
-    ) -> TelegramCountryPres: ...
+    ) -> CountryPresentation: ...
 
 
 def make_set_currency_callback(country_code: str) -> str:
     return f"setcurrency {country_code}"
 
 
-def format_price_into_str(price_minor: int, currency_3l: str):
+def format_price(price_minor: int, currency_3l: str):
     precision = babel.numbers.get_currency_precision(currency_3l)
     value = Decimal(price_minor) / 10**precision
     return babel.numbers.format_currency(value, currency_3l)
@@ -112,18 +111,11 @@ def format_price_into_str(price_minor: int, currency_3l: str):
 
 # TODO add support to multiple deals
 def _gameresult_to_gameresultvm(game: core.SourcedGame) -> GameResultVM:
-    # TODO see what code will be responsible for price formatting
-    deal = game.deals[0] if game.deals else None
-    price = (
-        None
-        if deal is None
-        else format_price_into_str(deal.value_minor, deal.currency_3l)
-    )
-
     historical_price_info = ""
     if game.price_overview is not None:
-        historical_price_info = f"Lowest price ever: {format_price_into_str(game.price_overview.lowest_value_minor, game.price_overview.currency_3l)}"
+        historical_price_info = f"Lowest price ever: {format_price(game.price_overview.lowest_value_minor, game.price_overview.currency_3l)}"
 
+    proton_vm = None
     if game.proton_db_info:
         proton_vm = ProtonDBVM(
             tier=game.proton_db_info.tier,
@@ -131,18 +123,47 @@ def _gameresult_to_gameresultvm(game: core.SourcedGame) -> GameResultVM:
             total_reports=game.proton_db_info.total,
             appid=game.external_id,
         )
-    else:
-        proton_vm = None
+
+    best_other_str = ""
+    best_other = None
+    if game.other_deals:
+        best_other = min(game.other_deals, key=lambda deal: deal.full_value_minor)
+        best_other_str = (
+            f"Best price available: [{best_other.source_shop}]"
+            f"({best_other.url}) {format_price(best_other.value_minor, best_other.currency_3l)}"
+        )
+
+    # plain-text description for InlineQueryResultArticle (no markdown support)
+    description = "Not purchasable"
+    if game.main_deal and game.main_deal.value_minor == 0:
+        description = "Price: Free"
+    elif game.main_deal is not None:
+        description = f"Price: {format_price(game.main_deal.value_minor, game.main_deal.currency_3l)}"
+        if game.main_deal.discount:
+            description += f" [-{game.main_deal.discount}%]"
+
+    # full markdown price line for input_message_content
+    price_line = "Not purchasable"
+    if game.main_deal and game.main_deal.value_minor == 0:
+        price_line = "Price: Free"
+    elif game.main_deal is not None:
+        price_line = f"Price: {format_price(game.main_deal.value_minor, game.main_deal.currency_3l)} "
+        if game.main_deal.discount:
+            price_line += f"[-{game.main_deal.discount}%] "
+        if best_other and best_other.value_minor == game.main_deal.value_minor:
+            price_line += f" [{best_other.source_shop}]({best_other.url}) {format_price(best_other.value_minor, best_other.currency_3l)}"
+        elif best_other:
+            price_line += "\n"
+            price_line += best_other_str
 
     return GameResultVM(
         id=game.game.id,
         link=game.url,
         title=game.game.title,
         appid=game.external_id,
-        price=price,
+        price_line=price_line,
+        description=description,
         historical_price_info=historical_price_info,
-        is_free=deal.full_value_minor == 0 if deal is not None else False,
-        discount=deal.discount if deal is not None else None,
         proton_db=proton_vm,
     )
 
@@ -163,33 +184,21 @@ class TelegramPresenter(ITelegramPresenter):
         )
         return text
 
-    def _game_price_line(self, game: GameResultVM) -> str:
-        price = (
-            "Price: FREE"
-            if game.is_free
-            else f"Price: {game.price}"
-            if game.price is not None
-            else "Not purchasable"
-        )
-        return price
-
     def _present_game_result_vm(self, game: GameResultVM) -> str:
-        price = self._game_price_line(game)
-        discount = f"\t\\[-{game.discount}%]" if game.discount else ""
+        price = game.price_line
 
         return (
-            f"[{game.title}]({game.link})"
-            + "\n"
+            f"[{game.title}]({game.link})\n"
             + price
-            + discount
             + "\n"
             + game.historical_price_info
-            + "\n"
+            + "\n\n"
             + self._present_proton_db_vm(game.proton_db)
+            + "\n"
         )
 
     def _make_inline_game_article(
-        self, game: GameResultVM, country_config: CountryConfig
+        self, game: GameResultVM, _: CountryConfig
     ) -> TelegramInlineArticlePres:
         keyboard_markup = self._make_keyboard_markup(
             appid=game.appid,
@@ -199,12 +208,10 @@ class TelegramPresenter(ITelegramPresenter):
 
         message_text = self._present_game_result_vm(game)
 
-        # this must be refactored asap.
-        # at this point it's soldered rather than coupled
         query_result = InlineQueryResultArticle(
             id=str(uuid4()),
             title=game.title,
-            description=self._game_price_line(game),
+            description=game.description,
             thumbnail_url=(
                 f"https://cdn.akamai.steamstatic.com/steam/apps/"
                 f"{game.appid}/capsule_sm_120.jpg?t"
@@ -237,7 +244,7 @@ class TelegramPresenter(ITelegramPresenter):
     def _make_inline_query_results_list(
         self,
         result: GameSearchResult,
-    ) -> TelegramInlineResultListPres:
+    ) -> InlineResultListPresentation:
         articles = []
         for game in result.search_results:
             game_vm = _gameresult_to_gameresultvm(game)
@@ -256,7 +263,7 @@ class TelegramPresenter(ITelegramPresenter):
             if not result.country_config.has_configured
             else None
         )
-        return TelegramInlineResultListPres(
+        return InlineResultListPresentation(
             button=button,
             results=articles,
         )
@@ -264,14 +271,14 @@ class TelegramPresenter(ITelegramPresenter):
     def make_inline_query_presentation(
         self,
         result: GameSearchResult,
-    ) -> TelegramInlineResultListPres:
+    ) -> InlineResultListPresentation:
         return self._make_inline_query_results_list(result)
 
     def make_error_presentation(
         self, error: SpecialResults
-    ) -> TelegramInlineResultListPres:
+    ) -> InlineResultListPresentation:
         article = self._make_special_inline_query_result(error)
-        return TelegramInlineResultListPres(results=[article], button=None)
+        return InlineResultListPresentation(results=[article], button=None)
 
     def make_delete_confirmation(self, success: bool) -> TelegramPresentation:
         if success:
@@ -299,7 +306,7 @@ class TelegramPresenter(ITelegramPresenter):
         self,
         country_mod: Optional[CountryModification],
         alternative_suggestions: list[str],
-    ) -> TelegramCountryPres:
+    ) -> CountryPresentation:
 
         if country_mod:
             if country_mod.configured_country:
@@ -321,7 +328,7 @@ class TelegramPresenter(ITelegramPresenter):
             )
             kb = self._make_country_keyboard(alternative_suggestions)
 
-        return TelegramCountryPres(text=text, keyboard=kb, parse_mode="Markdown")
+        return CountryPresentation(text=text, keyboard=kb, parse_mode="Markdown")
 
     def _make_keyboard_markup(
         self, appid: str, steam_link: str, has_proton_db: bool

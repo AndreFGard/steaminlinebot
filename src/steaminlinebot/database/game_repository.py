@@ -1,9 +1,9 @@
 import datetime
 import logging
-from abc import ABC, abstractmethod
+import traceback
 from typing import Optional
 
-from sqlalchemy import Connection, Engine, Row, select
+from sqlalchemy import Connection, Engine, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from steaminlinebot.database.schema import (
@@ -13,19 +13,16 @@ from steaminlinebot.database.schema import (
     game_table,
     historical_low_table,
     proton_report_table,
-    DBProductType,
-    DealFlag_,
 )
 from steaminlinebot.game.core import (
     GameDeal,
-    Game,
-    GameSource,
+    COMMON_GAME_SOURCE_NAMES,
     HistoricalPriceData,
     LowestPriceInPeriod,
     ProductType,
-    SourcedGame,
 )
 from steaminlinebot.game.protondb_report import ProtonDBReport, ProtonDBTier
+from steaminlinebot.game.repository import IGameRepository
 from steaminlinebot.integration.protondb_client import ScrapedProtonDBReport
 
 log = logging.getLogger(__name__)
@@ -35,62 +32,18 @@ class SourceNotFoundError(LookupError):
     """Raised when a named game source is not found in game_source."""
 
 
-class IGameRepository(ABC):
-    @abstractmethod
-    def add_game_source(
-        self, game_id: int, game_source: GameSource, external_id: str
-    ) -> None: ...
-
-    @abstractmethod
-    def get_game_id_on_source(
-        self, game_id: int, game_source: GameSource
-    ) -> Optional[str]: ...
-
-    @abstractmethod
-    def get_or_insert_game(
-        self,
-        title: str,
-        product_type: ProductType,
-        source: GameSource,
-        external_id: str,
-    ) -> int: ...
-    @abstractmethod
-    def get_historical_price(
-        self, game_id: int, country_2l: str, scope: LowestPriceInPeriod
-    ) -> HistoricalPriceData | None: ...
-
-    @abstractmethod
-    def insert_full_game(
-        self,
-        title: str,
-        product_type: ProductType,
-        external_id: str,
-        url: str,
-        deals: list[GameDeal],
-        game_source: GameSource,
-        price_overview: Optional[HistoricalPriceData],
-        proton_db_report: Optional[ScrapedProtonDBReport] = None,
-    ) -> SourcedGame:
-        """Returns the id on the specified index"""
-        ...
-
-
 class GameRepository(IGameRepository):
     def __init__(self, engine: Engine):
         self._engine = engine
 
     def add_game_source(
-        self, game_id: int, game_source: GameSource, external_id: str
+        self, game_id: int, game_source: COMMON_GAME_SOURCE_NAMES, external_id: str
     ) -> None:
         with self._engine.begin() as conn:
             source = _get_source_by_name(conn, game_source.value)
             conn.execute(
                 sqlite_insert(game_external_id_table)
-                .values(
-                    game_id=game_id,
-                    external_id=external_id,
-                    source_id=source.id,
-                )
+                .values(game_id=game_id, external_id=external_id, source_id=source)
                 .on_conflict_do_update(
                     index_elements=["game_id", "source_id"],
                     set_={"external_id": external_id},
@@ -117,15 +70,27 @@ class GameRepository(IGameRepository):
                 )
             return None
 
+    def insert_proton_report(
+        self, game_id: int, report: ScrapedProtonDBReport | None
+    ) -> ProtonDBReport | None:
+        with self._engine.begin() as conn:
+            return _insert_proton_report(conn, game_id, report)
+
+    def upsert_historical_price(
+        self, game_id: int, historical_price: HistoricalPriceData
+    ) -> None:
+        with self._engine.begin() as conn:
+            _upsert_historical_low(conn, game_id, historical_price)
+
     def get_game_id_on_source(
-        self, game_id: int, game_source: GameSource
+        self, game_id: int, game_source: COMMON_GAME_SOURCE_NAMES
     ) -> Optional[str]:
         with self._engine.begin() as conn:
             source = _get_source_by_name(conn, game_source.value)
             row = conn.execute(
                 select(game_external_id_table).where(
                     game_external_id_table.c.game_id == game_id,
-                    game_external_id_table.c.source_id == source.id,
+                    game_external_id_table.c.source_id == source,
                 )
             ).first()
             if row is not None:
@@ -134,57 +99,53 @@ class GameRepository(IGameRepository):
 
     def get_or_insert_game(
         self,
-        title: str,
+        title: str | None,
         product_type: ProductType,
-        source: GameSource,
+        source: str,
         external_id: str,
     ) -> int:
         with self._engine.begin() as conn:
-            source_row = _get_source_by_name(conn, source.value)
+            source_row = _get_source_by_name(conn, source)
             return _get_or_insert_game(
-                conn, title, product_type, source_row.id, external_id
+                conn, title or "", product_type, source_row, external_id
             )
 
-    def insert_full_game(
-        self,
-        title: str,
-        product_type: ProductType,
-        external_id: str,
-        url: str,
-        deals: list[GameDeal],
-        game_source: GameSource,
-        price_overview: Optional[HistoricalPriceData],
-        proton_db_report: Optional[ScrapedProtonDBReport] = None,
-    ) -> SourcedGame:
+    def insert_deal(self, game_id: int, deal: GameDeal) -> int:
         with self._engine.begin() as conn:
-            source = _get_source_by_name(conn, game_source.value)
-            game_id = _get_or_insert_game(
-                conn, title, product_type, source.id, external_id
-            )
-            game = Game(id=game_id, title=title, product_type=product_type)
+            source_id = _get_source_by_name(conn, deal.source_shop)
+            return _insert_deal(conn, game_id, source_id, deal)
 
-            inserted_deals = [
-                _insert_deal(conn, game_id, source.id, deal, url) for deal in deals
-            ]
+    def record_observation(
+        self,
+        title: str | None,
+        product_type: ProductType,
+        source: str,
+        external_id: str,
+        deals: list[GameDeal],
+        historical_price: HistoricalPriceData | None,
+        proton_report: ScrapedProtonDBReport | None,
+    ) -> tuple[int, ProtonDBReport | None]:
+        game_id = self.get_or_insert_game(title, product_type, source, external_id)
 
-            if price_overview is not None:
-                _upsert_historical_low(conn, game_id, price_overview)
+        for deal in deals:
+            if deal is not None:
+                try:
+                    self.insert_deal(game_id, deal)
+                except Exception:
+                    log.error(
+                        f"Failed to insert deal '{deal.model_dump_json(indent=2)}'"
+                    )
+                    traceback.print_exc()
 
-            proton_db_info = _insert_proton_report(conn, game_id, proton_db_report)
+        proton_db_info = self.insert_proton_report(game_id, proton_report)
 
-            return SourcedGame(
-                game=game,
-                external_id=external_id,
-                game_source=game_source,
-                deals=inserted_deals,
-                url=url,
-                price_overview=price_overview,
-                proton_db_info=proton_db_info,
-            )
+        if historical_price is not None:
+            self.upsert_historical_price(game_id, historical_price)
+
+        return game_id, proton_db_info
 
 
-def _get_source_by_name(conn: Connection, name: str) -> Row:
-    """This errors if the source is not there."""
+def _get_source_by_name(conn: Connection, name: str) -> int:
     row = conn.execute(
         select(game_source_table).where(game_source_table.c.name == name)
     ).first()
@@ -193,8 +154,7 @@ def _get_source_by_name(conn: Connection, name: str) -> Row:
         raise SourceNotFoundError(
             f"Game source '{name}' not found in game_source table."
         )
-
-    return row
+    return row.id
 
 
 def _get_or_insert_game(
@@ -218,11 +178,12 @@ def _get_or_insert_game(
     result = conn.execute(
         game_table.insert().values(
             title=title,
-            product_type=DBProductType(product_type.value),
+            product_type=ProductType(product_type.value),
         )
     )
-    game_id: int = result.inserted_primary_key[0]  # type: ignore[assignment]
+    assert result.inserted_primary_key is not None
 
+    game_id = result.inserted_primary_key[0]
     conn.execute(
         sqlite_insert(game_external_id_table)
         .values(game_id=game_id, source_id=source_id, external_id=external_id)
@@ -237,11 +198,10 @@ def _insert_deal(
     game_id: int,
     source_id: int,
     deal: GameDeal,
-    url: str,
-) -> GameDeal:
+) -> int:
     now = datetime.datetime.now(datetime.timezone.utc)
     flag = (
-        DealFlag_(deal.historical_deal.value)
+        LowestPriceInPeriod(deal.historical_deal.value)
         if deal.historical_deal is not None
         else None
     )
@@ -259,21 +219,11 @@ def _insert_deal(
             discount=deal.discount,
             flag=flag,
             price_expires_at=deal.price_expires_at,
-            url=url,
+            url=deal.url,
         )
     )
-    result.inserted_primary_key[0]  # type: ignore[assignment]
-
-    return GameDeal(
-        value_minor=deal.value_minor,
-        currency_3l=deal.currency_3l,
-        full_value_minor=deal.full_value_minor,
-        discount=deal.discount,
-        country_l2=deal.country_l2,
-        price_expires_at=deal.price_expires_at,
-        observed_date=deal.observed_date,
-        historical_deal=deal.historical_deal,
-    )
+    assert result.inserted_primary_key is not None
+    return result.inserted_primary_key[0]
 
 
 def _upsert_historical_low(

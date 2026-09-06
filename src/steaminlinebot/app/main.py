@@ -51,6 +51,7 @@ if not os.path.exists("./data"):
 
 
 async def help(update: Update, context):
+    assert update.message is not None
     return await update.message.reply_text(  # type: ignore
         f"To search with this bot, type {botname} and then something "
         f"you want to search in the message box. for example:\n"
