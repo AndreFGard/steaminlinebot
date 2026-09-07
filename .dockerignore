@@ -103,7 +103,6 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
 .venv
 env/
 venv/
@@ -130,6 +129,3 @@ dmypy.json
 .pyre/
 
 uv.lock
-
-**/*sqlite*
-.vscode

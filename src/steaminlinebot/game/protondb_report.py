@@ -18,10 +18,10 @@ class ProtonDBTier(IntEnum):
 
     def to_emoji(self):
         return {
-            "GOLD": "✔️(4/5)",
-            "SILVER": "✔️(3/5)",
-            "BRONZE": "🟡(2/5)",
-            "PLATINUM": "✅(5/5)",
+            "GOLD": "🏅(4/5)",
+            "SILVER": "🥈(3/5)",
+            "BRONZE": "🥈(2/5)",
+            "PLATINUM": "🏅(5/5)",
             "BORKED": "❌ (1/5)",
         }[self.name]
 

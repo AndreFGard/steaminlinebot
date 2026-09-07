@@ -29,6 +29,8 @@ class IGameSearcherService(ABC):
 async def _get_itad_overview_by_appid(
     itad_client: itad_client.IITADClient, steam_appids: list[int], country_2l: str
 ) -> dict[int, itad_client.ITADPriceOverview | None]:
+    if not steam_appids:
+        return {}
     """Map Steam app ids to their ITAD price overview (or None)."""
     itad_ids = await itad_client.lookup_by_steam_appid(steam_appids)
     requested = [game_id for game_id in itad_ids if game_id is not None]
@@ -59,12 +61,12 @@ class GameSearchService(IGameSearcherService):
         country_2l: str,
     ):
         results: list[core.SourcedGame] = []
-        appids = await self._client.search_game_title(query, country_2l)
+        steam_games = await self._client.search_game_title(query, country_2l)
         steam_results, itad_by_appid = await asyncio.gather(
-            self._client.scrape_game_results(appids, country_2l),
+            self._client.scrape_game_results(steam_games, country_2l),
             _get_itad_overview_by_appid(
                 self._itad_client,
-                [int(game.appid) for game in appids],
+                [int(game.appid) for game in steam_games],
                 country_2l,
             ),
         )
@@ -115,6 +117,7 @@ class GameSearchService(IGameSearcherService):
                     url=steam_game.link,
                     price_overview=historical_price,
                     proton_db_info=proton_db_info,
+                    is_free=steam_game.is_free,
                 )
                 results.append(sourced_game)
             except Exception as e:

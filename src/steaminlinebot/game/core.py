@@ -104,3 +104,4 @@ class SourcedGame(pydantic.BaseModel):
     price_overview: Optional[HistoricalPriceData]
     """Only exists for games available on steam"""
     proton_db_info: Optional[ProtonDBReport]
+    is_free: bool = False

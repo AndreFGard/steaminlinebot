@@ -124,18 +124,16 @@ def _gameresult_to_gameresultvm(game: core.SourcedGame) -> GameResultVM:
             appid=game.external_id,
         )
 
-    best_other_str = ""
-    best_other = None
-    if game.other_deals:
-        best_other = min(game.other_deals, key=lambda deal: deal.full_value_minor)
-        best_other_str = (
-            f"Best price available: [{best_other.source_shop}]"
-            f"({best_other.url}) {format_price(best_other.value_minor, best_other.currency_3l)}"
-        )
+    all_deals = (game.other_deals or []) + ([game.main_deal] if game.main_deal else [])
+    best_deal = min(all_deals, key=lambda deal: deal.value_minor) if all_deals else None
+    best_deal_str = ""
+    if best_deal:
+        best_deal_str = f"Best price available: [{format_price(best_deal.value_minor, best_deal.currency_3l)} - {best_deal.source_shop}]({best_deal.url})"
 
     # plain-text description for InlineQueryResultArticle (no markdown support)
     description = "Not purchasable"
-    if game.main_deal and game.main_deal.value_minor == 0:
+
+    if game.is_free or (game.main_deal and game.main_deal.value_minor == 0):
         description = "Price: Free"
     elif game.main_deal is not None:
         description = f"Price: {format_price(game.main_deal.value_minor, game.main_deal.currency_3l)}"
@@ -144,17 +142,17 @@ def _gameresult_to_gameresultvm(game: core.SourcedGame) -> GameResultVM:
 
     # full markdown price line for input_message_content
     price_line = "Not purchasable"
-    if game.main_deal and game.main_deal.value_minor == 0:
+    if game.is_free or (game.main_deal and game.main_deal.value_minor == 0):
         price_line = "Price: Free"
     elif game.main_deal is not None:
         price_line = f"Price: {format_price(game.main_deal.value_minor, game.main_deal.currency_3l)} "
         if game.main_deal.discount:
             price_line += f"[-{game.main_deal.discount}%] "
-        if best_other and best_other.value_minor == game.main_deal.value_minor:
-            price_line += f" [{best_other.source_shop}]({best_other.url}) {format_price(best_other.value_minor, best_other.currency_3l)}"
-        elif best_other:
+        if best_deal and best_deal.value_minor == game.main_deal.value_minor:
+            price_line += " (Best price anywhere!)"
+        elif best_deal:
             price_line += "\n"
-            price_line += best_other_str
+            price_line += best_deal_str
 
     return GameResultVM(
         id=game.game.id,
@@ -178,8 +176,8 @@ class TelegramPresenter(ITelegramPresenter):
 
         text = (
             f"[ProtonDB Tier](https://www.protondb.com/app/{protondb.appid}): {str(protondb.tier)}"
+            f"{tier_emoji} "
             f" {'📈' if protondb.positive_trend else '📉'}"
-            f"{tier_emoji}"
             f"\t({protondb.total_reports} reports)"
         )
         return text
@@ -192,7 +190,7 @@ class TelegramPresenter(ITelegramPresenter):
             + price
             + "\n"
             + game.historical_price_info
-            + "\n\n"
+            + "\n"
             + self._present_proton_db_vm(game.proton_db)
             + "\n"
         )
