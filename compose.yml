@@ -2,13 +2,13 @@
 services:
   bot:
     env_file:
-    - .env
-    image: steaminline-bot:latest
+      - .env
+    image: steaminlinebot:latest
     build: .
     container_name: python-bot
     working_dir: /bot
     volumes:
       - ./data:/bot/data
     command: >
-      sh -c "python main.py 2>> /bot/data/errors.log"
+      sh -c "uv run bot 2>> /bot/data/errors.log"
     restart: unless-stopped
