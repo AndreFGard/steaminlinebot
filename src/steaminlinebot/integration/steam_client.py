@@ -25,7 +25,7 @@ class SteamGame(pydantic.BaseModel):
     country_2l: str
     title: Optional[str]
 
-    #TODO: if I could detect a non-currency price, this could shortcircuit and avoid ITAD queries.
+    # TODO: if I could detect a non-currency price, this could shortcircuit and avoid ITAD queries.
     _formatted_price: Optional[str]
 
 

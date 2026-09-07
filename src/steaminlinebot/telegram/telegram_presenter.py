@@ -7,7 +7,6 @@ from uuid import uuid4
 
 import babel
 import babel.numbers
-import pydantic
 from telegram import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -18,29 +17,17 @@ from telegram import (
 
 from steaminlinebot.game import core
 from steaminlinebot.game.game_search_usecase import GameSearchResult
-from steaminlinebot.game.protondb_report import ProtonDBTier
 from steaminlinebot.user.user_country import CountryConfig, CountryModification
 
 
 @dataclass
-class ProtonDBVM:
-    tier: ProtonDBTier
-    positive_trend: bool
-    total_reports: int
-    appid: str
-
-
-class GameResultVM(pydantic.BaseModel):
-    """View Model"""
-
-    id: int
-    link: str
+class GameResultStrings:
     title: str
+    link: str
     appid: str
-    historical_price_info: str
-    price_line: str
     description: str
-    proton_db: Optional[ProtonDBVM]
+    message_text: str
+    has_proton_db: bool
 
 
 class SpecialResults(Enum):
@@ -103,36 +90,54 @@ def make_set_currency_callback(country_code: str) -> str:
     return f"setcurrency {country_code}"
 
 
+_PROTONDB_TIER_EMOJI: dict[str, str] = {
+    "GOLD": "🏅(4/5)",
+    "SILVER": "🥈(3/5)",
+    "BRONZE": "🥈(2/5)",
+    "PLATINUM": "🏅(5/5)",
+    "BORKED": "❌ (1/5)",
+}
+
+
 def format_price(price_minor: int, currency_3l: str):
     precision = babel.numbers.get_currency_precision(currency_3l)
     value = Decimal(price_minor) / 10**precision
     return babel.numbers.format_currency(value, currency_3l)
 
 
-# TODO add support to multiple deals
-def _gameresult_to_gameresultvm(game: core.SourcedGame) -> GameResultVM:
+def format_game_result(game: core.SourcedGame) -> GameResultStrings:
+    """Builds all user-facing strings for a game search result."""
+
     historical_price_info = ""
     if game.price_overview is not None:
-        historical_price_info = f"Lowest price ever: {format_price(game.price_overview.lowest_value_minor, game.price_overview.currency_3l)}"
+        historical_price_info = (
+            f"Lowest price ever: "
+            f"{format_price(game.price_overview.lowest_value_minor, game.price_overview.currency_3l)}"
+        )
 
-    proton_vm = None
+    proton_db_text = ""
     if game.proton_db_info:
-        proton_vm = ProtonDBVM(
-            tier=game.proton_db_info.tier,
-            positive_trend=False,
-            total_reports=game.proton_db_info.total,
-            appid=game.external_id,
+        tier_emoji = _PROTONDB_TIER_EMOJI.get(game.proton_db_info.tier.name, "")
+        proton_db_text = (
+            f"[ProtonDB Tier](https://www.protondb.com/app/{game.external_id}): "
+            f"{game.proton_db_info.tier}{tier_emoji} "
+            f"{'📈' if False else '📉'}"
+            f"\t({game.proton_db_info.total} reports)"
         )
 
     all_deals = (game.other_deals or []) + ([game.main_deal] if game.main_deal else [])
     best_deal = min(all_deals, key=lambda deal: deal.value_minor) if all_deals else None
+
     best_deal_str = ""
     if best_deal:
-        best_deal_str = f"Best price available: [{format_price(best_deal.value_minor, best_deal.currency_3l)} - {best_deal.source_shop}]({best_deal.url})"
+        best_deal_str = (
+            f"Best price available: "
+            f"[{format_price(best_deal.value_minor, best_deal.currency_3l)} "
+            f"- {best_deal.source_shop}]({best_deal.url})"
+        )
 
     # plain-text description for InlineQueryResultArticle (no markdown support)
     description = "Not purchasable"
-
     if game.is_free or (game.main_deal and game.main_deal.value_minor == 0):
         description = "Price: Free"
     elif game.main_deal is not None:
@@ -149,81 +154,61 @@ def _gameresult_to_gameresultvm(game: core.SourcedGame) -> GameResultVM:
         if game.main_deal.discount:
             price_line += f"[-{game.main_deal.discount}%] "
         if best_deal and best_deal.value_minor == game.main_deal.value_minor:
-            price_line += " (Best price anywhere!)"
+            price_line += "(Best price anywhere!)"
         elif best_deal:
-            price_line += "\n"
-            price_line += best_deal_str
+            price_line += "\n" + best_deal_str
 
-    return GameResultVM(
-        id=game.game.id,
-        link=game.url,
+    # assemble the full message text
+    message_text = (
+        f"[{game.game.title}]({game.url})\n"
+        + price_line
+        + "\n"
+        + historical_price_info
+        + "\n"
+        + proton_db_text
+        + "\n"
+    )
+
+    return GameResultStrings(
         title=game.game.title,
+        link=game.url,
         appid=game.external_id,
-        price_line=price_line,
         description=description,
-        historical_price_info=historical_price_info,
-        proton_db=proton_vm,
+        message_text=message_text,
+        has_proton_db=game.proton_db_info is not None,
     )
 
 
 class TelegramPresenter(ITelegramPresenter):
     """Concrete implementation: builds real Telegram API objects."""
 
-    def _present_proton_db_vm(self, protondb: ProtonDBVM | None) -> str:
-        if not protondb:
-            return ""
-        tier_emoji = protondb.tier.to_emoji()
-
-        text = (
-            f"[ProtonDB Tier](https://www.protondb.com/app/{protondb.appid}): {str(protondb.tier)}"
-            f"{tier_emoji} "
-            f" {'📈' if protondb.positive_trend else '📉'}"
-            f"\t({protondb.total_reports} reports)"
-        )
-        return text
-
-    def _present_game_result_vm(self, game: GameResultVM) -> str:
-        price = game.price_line
-
-        return (
-            f"[{game.title}]({game.link})\n"
-            + price
-            + "\n"
-            + game.historical_price_info
-            + "\n"
-            + self._present_proton_db_vm(game.proton_db)
-            + "\n"
-        )
-
     def _make_inline_game_article(
-        self, game: GameResultVM, _: CountryConfig
+        self, strings: GameResultStrings, _: CountryConfig
     ) -> TelegramInlineArticlePres:
         keyboard_markup = self._make_keyboard_markup(
-            appid=game.appid,
-            steam_link=game.link,
-            has_proton_db=game.proton_db is not None,
+            appid=strings.appid,
+            steam_link=strings.link,
+            has_proton_db=strings.has_proton_db,
         )
-
-        message_text = self._present_game_result_vm(game)
 
         query_result = InlineQueryResultArticle(
             id=str(uuid4()),
-            title=game.title,
-            description=game.description,
+            title=strings.title,
+            description=strings.description,
             thumbnail_url=(
-                f"https://cdn.akamai.steamstatic.com/steam/apps/"
-                f"{game.appid}/capsule_sm_120.jpg?t"
+                "https://cdn.akamai.steamstatic.com/steam/apps/"
+                f"{strings.appid}/capsule_sm_120.jpg?t"
             ),
             input_message_content=InputTextMessageContent(
                 parse_mode="Markdown",
-                message_text=message_text,
+                message_text=strings.message_text,
             ),
             reply_markup=keyboard_markup,
         )
 
         return TelegramInlineArticlePres(
             query_article=query_result,
-            text=message_text,
+            text=strings.message_text,
             keyboard=keyboard_markup,
             parse_mode="Markdown",
         )
@@ -245,9 +230,9 @@ class TelegramPresenter(ITelegramPresenter):
     ) -> InlineResultListPresentation:
         articles = []
         for game in result.search_results:
-            game_vm = _gameresult_to_gameresultvm(game)
+            strings = format_game_result(game)
             article = self._make_inline_game_article(
-                game_vm, result.country_config
+                strings, result.country_config
             ).query_article
             articles.append(article)
 
