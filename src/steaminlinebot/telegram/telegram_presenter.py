@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
-from typing import Optional
 from uuid import uuid4
 
 import babel
@@ -59,7 +58,7 @@ class CountryPresentation(TelegramPresentation): ...
 @dataclass
 class InlineResultListPresentation:
     results: list[InlineQueryResultArticle]
-    button: Optional[InlineQueryResultsButton]
+    button: InlineQueryResultsButton | None
 
 
 class ITelegramPresenter(ABC):
@@ -81,7 +80,7 @@ class ITelegramPresenter(ABC):
 
     def make_currency_message_from_country(
         self,
-        country_mod: Optional[CountryModification],
+        country_mod: CountryModification | None,
         alternative_suggestions: list[str],
     ) -> CountryPresentation: ...
 
@@ -287,7 +286,7 @@ class TelegramPresenter(ITelegramPresenter):
 
     def make_currency_message_from_country(
         self,
-        country_mod: Optional[CountryModification],
+        country_mod: CountryModification | None,
         alternative_suggestions: list[str],
     ) -> CountryPresentation:
 

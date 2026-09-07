@@ -1,7 +1,6 @@
 import asyncio
 import logging
 from abc import ABC, abstractmethod
-from typing import Optional, Union
 from urllib.parse import urlencode
 
 import aiohttp
@@ -23,15 +22,15 @@ from steaminlinebot.integration.protondb_client import (
 class SteamGame(pydantic.BaseModel):
     appid: str
     country_2l: str
-    title: Optional[str]
+    title: str | None
 
     # TODO: if I could detect a non-currency price, this could shortcircuit and avoid ITAD queries.
-    _formatted_price: Optional[str]
+    _formatted_price: str | None
 
 
 @dataclass
 class ScrapeResult:
-    found_error: Union[bool, Exception]
+    found_error: bool | Exception
     results: list[ScrapedSteamGame]
 
 
@@ -50,8 +49,8 @@ class ISteamClient(ABC):
 
 def _make_game_result(
     game_details: dict,
-    proton_db_report: Optional[ScrapedProtonDBReport] = None,
-    country: Optional[str] = None,
+    proton_db_report: ScrapedProtonDBReport | None = None,
+    country: str | None = None,
 ):
     try:
         appid: str = tuple(game_details.keys())[0]

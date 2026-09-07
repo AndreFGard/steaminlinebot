@@ -1,6 +1,5 @@
 import datetime
 import enum
-from typing import Optional
 
 import pydantic
 
@@ -32,12 +31,12 @@ class GameDeal(pydantic.BaseModel):
     full_value_minor: int
     """Follows the standardized currency representation"""
     discount: int
-    country_l2: Optional[str]
-    price_expires_at: Optional[datetime.datetime]
-    observed_date: Optional[datetime.datetime]
+    country_l2: str | None
+    price_expires_at: datetime.datetime | None
+    observed_date: datetime.datetime | None
     # TODO change for historical deal again
     """If the current price is a historical low or not"""
-    historical_deal: Optional[LowestPriceInPeriod]
+    historical_deal: LowestPriceInPeriod | None
     url: str
     source_shop: str
 
@@ -87,9 +86,9 @@ class ScrapedSteamGame(pydantic.BaseModel):
     link: str
     title: str
     appid: str
-    cost: Optional[ScrapedCost]
+    cost: ScrapedCost | None
     is_free: bool
-    proton_db_report: Optional[ScrapedProtonDBReport] = None
+    proton_db_report: ScrapedProtonDBReport | None = None
     # TODO make enum
     product_type: ProductType
 
@@ -98,10 +97,10 @@ class SourcedGame(pydantic.BaseModel):
     game: Game
     external_id: str
     game_source: COMMON_GAME_SOURCE_NAMES
-    main_deal: Optional[GameDeal]
+    main_deal: GameDeal | None
     other_deals: list[GameDeal]
     url: str
-    price_overview: Optional[HistoricalPriceData]
+    price_overview: HistoricalPriceData | None
     """Only exists for games available on steam"""
-    proton_db_info: Optional[ProtonDBReport]
+    proton_db_info: ProtonDBReport | None
     is_free: bool = False

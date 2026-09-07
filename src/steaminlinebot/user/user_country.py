@@ -1,7 +1,6 @@
 import logging
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
-from typing import Optional
 
 from steaminlinebot.database.user_repository import IUserRepository
 
@@ -16,7 +15,7 @@ _POPULAR_COUNTRY_CODES = ["BR", "US", "MX", "PL"]
 class CountryModification:
     """Might be None if unsuccessful"""
 
-    configured_country: Optional[str]
+    configured_country: str | None
     requested_country: str
 
 
@@ -28,7 +27,7 @@ class CountryConfig:
 
 @dataclass
 class CountrySetResult:
-    modification: Optional[CountryModification]
+    modification: CountryModification | None
     suggestions: list[str]
 
 
@@ -38,7 +37,7 @@ class IUserCountry(ABC):
 
     @abstractmethod
     async def resolve_country(
-        self, user_id: int, fallback_user_language_etf: Optional[str]
+        self, user_id: int, fallback_user_language_etf: str | None
     ) -> CountryConfig: ...
 
     @abstractmethod
@@ -49,11 +48,11 @@ class IUserCountry(ABC):
         self,
         user_id: int,
         requested_country: str,
-        lang_2l_or_ietf: Optional[str] = None,
+        lang_2l_or_ietf: str | None = None,
     ) -> CountrySetResult: ...
 
     @abstractmethod
-    async def suggest_countries(self, lang_2l_or_ietf: Optional[str]) -> list[str]:
+    async def suggest_countries(self, lang_2l_or_ietf: str | None) -> list[str]:
         """Returns a list of likely countries for the user, based on a language-only tag, or None."""
         ...
 
@@ -64,7 +63,7 @@ class UserCountry(IUserCountry):
         self._user_repo = user_repo
 
     async def resolve_country(
-        self, user_id: int, fallback_user_language_etf: Optional[str]
+        self, user_id: int, fallback_user_language_etf: str | None
     ) -> CountryConfig:
         country = self._user_repo.get_user_country(user_id)
         has_set = True
@@ -85,7 +84,7 @@ class UserCountry(IUserCountry):
         self,
         user_id: int,
         requested_country: str,
-        lang_2l_or_ietf: Optional[str] = None,
+        lang_2l_or_ietf: str | None = None,
     ) -> CountrySetResult:
         suggestions = await self.suggest_countries(lang_2l_or_ietf)
 
@@ -113,7 +112,7 @@ class UserCountry(IUserCountry):
 
         return CountrySetResult(modification=modification, suggestions=suggestions)
 
-    async def suggest_countries(self, lang_2l_or_ietf: Optional[str]) -> list[str]:
+    async def suggest_countries(self, lang_2l_or_ietf: str | None) -> list[str]:
         if not lang_2l_or_ietf:
             logging.warning("Suggesting default-based language")
             lang_2l_or_ietf = _DEFAULT_LANGUAGE

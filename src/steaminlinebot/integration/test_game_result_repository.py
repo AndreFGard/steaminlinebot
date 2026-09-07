@@ -1,7 +1,6 @@
 import pytest
 from sqlalchemy import create_engine, select
 import sqlalchemy
-from typing import Optional
 
 from steaminlinebot.database.schema import (
     country_table,
@@ -36,7 +35,7 @@ def _setup_engine() -> "sqlalchemy.Engine":
 
 
 def _seed_source(
-    engine: "sqlalchemy.Engine", name: str, itad_shop_id: Optional[str] = None
+    engine: "sqlalchemy.Engine", name: str, itad_shop_id: str | None = None
 ) -> None:
     """Insert an additional game source (e.g. ITAD) into the engine."""
     with engine.begin() as conn:

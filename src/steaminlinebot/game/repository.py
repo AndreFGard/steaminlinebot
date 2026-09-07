@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Optional
 
 from steaminlinebot.game.core import (
     GameDeal,
@@ -21,7 +20,7 @@ class IGameRepository(ABC):
     @abstractmethod
     def get_game_id_on_source(
         self, game_id: int, game_source: COMMON_GAME_SOURCE_NAMES
-    ) -> Optional[str]: ...
+    ) -> str | None: ...
 
     @abstractmethod
     def get_or_insert_game(

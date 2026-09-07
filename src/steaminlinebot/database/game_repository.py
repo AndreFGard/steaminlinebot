@@ -1,7 +1,6 @@
 import datetime
 import logging
 import traceback
-from typing import Optional
 
 from sqlalchemy import Connection, Engine, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -84,7 +83,7 @@ class GameRepository(IGameRepository):
 
     def get_game_id_on_source(
         self, game_id: int, game_source: COMMON_GAME_SOURCE_NAMES
-    ) -> Optional[str]:
+    ) -> str | None:
         with self._engine.begin() as conn:
             source = _get_source_by_name(conn, game_source.value)
             row = conn.execute(

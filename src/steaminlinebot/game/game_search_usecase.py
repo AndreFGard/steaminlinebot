@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Optional
 
 from steaminlinebot.game.core import SourcedGame
 from steaminlinebot.game.game_searcher_service import (
@@ -19,7 +18,7 @@ class GameSearchResult:
 
 class IGameSearchUsecase:
     async def handle_game_search(
-        self, query: str, user_id: int, user_lang_etf: Optional[str]
+        self, query: str, user_id: int, user_lang_etf: str | None
     ) -> GameSearchResult: ...
 
 
@@ -33,7 +32,7 @@ class GameSearchUsecase(IGameSearchUsecase):
         self.search_games = search_games
 
     async def handle_game_search(
-        self, query: str, user_id: int, user_lang_etf: Optional[str]
+        self, query: str, user_id: int, user_lang_etf: str | None
     ) -> GameSearchResult:
         if len(query) < 3:
             raise QueryTooShortError(str(query))
