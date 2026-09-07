@@ -31,3 +31,7 @@ build-backend = "uv_build"
 [tool.pytest.ini_options]
 testpaths = ["src"]
 asyncio_mode = "auto"
+
+[tool.basedpyright]
+reportAny = false
+reportImplicitOverride = false

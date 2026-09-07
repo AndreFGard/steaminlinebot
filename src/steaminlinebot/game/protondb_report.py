@@ -2,7 +2,8 @@ from enum import IntEnum
 
 import pydantic
 
-#TODO move to enum.Enum
+
+# TODO move to enum.Enum
 class ProtonDBTier(IntEnum):
     BORKED = 1
     BRONZE = 2
