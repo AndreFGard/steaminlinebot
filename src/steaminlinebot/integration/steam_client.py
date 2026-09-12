@@ -20,7 +20,7 @@ from steaminlinebot.integration.protondb_client import (
 
 
 class SteamGame(pydantic.BaseModel):
-    appid: str
+    appid: int
     country_2l: str
     title: str | None
 
@@ -53,13 +53,13 @@ def _make_game_result(
     country: str | None = None,
 ):
     try:
-        appid: str = tuple(game_details.keys())[0]
+        appid = int(list(game_details.keys())[0])
 
-        if not game_details[appid]["success"]:
+        if not game_details[str(appid)]["success"]:
             raise Exception(f"Unsuccessful game_details result: {game_details}")
 
         link = f"https://store.steampowered.com/app/{appid}/"
-        data = game_details[appid]["data"]
+        data = game_details[str(appid)]["data"]
         title = data["name"]
         product_type = data["type"]
 
@@ -99,7 +99,7 @@ _API_APP_DETAILS_URL = "https://store.steampowered.com/api/appdetails"
 
 
 async def _get_game_details_json(
-    appid, country, session: aiohttp.ClientSession
+    appid: int, country: str, session: aiohttp.ClientSession
 ) -> dict:
     """makes steam api details request for given appid and returns future for it's json response"""
     params = {
@@ -117,7 +117,7 @@ async def _get_game_details_json(
 
 # we need this only to get discount data, as _get_game_suggestions doesnt have it
 async def _get_many_game_details(
-    appids: list[str], country_2l, session: aiohttp.ClientSession
+    appids: list[int], country_2l, session: aiohttp.ClientSession
 ) -> list[dict]:
     """gets game details for each given appid and returns list with every response's json"""
     tasks = [
@@ -135,7 +135,9 @@ def parse_game_appids_from_suggest_html(
     games = []
     for game in suggest_html_data.find_all("a"):
         if game.has_attr("data-ds-appid"):
-            appid = str(game["data-ds-appid"])
+            # suggest may return bundles/collections whose data-ds-appid is a
+            # comma-separated list of appids, e.g. "219780,214170,219760"
+            appids = str(game["data-ds-appid"]).split(",")
 
             price = game.find("div", attrs={"class": "match_price"})
             if price is not None:
@@ -145,15 +147,28 @@ def parse_game_appids_from_suggest_html(
             if name is not None:
                 name = str(name)
 
-            games.append(
-                SteamGame(
-                    appid=appid,
-                    title=name,
-                    _formatted_price=price,
-                    country_2l=country_2l,
+            for appid in appids:
+                try:
+                    parsed_appid = int(appid.strip())
+                except ValueError:
+                    logging.warning(f"Skipping non-numeric appid {appid!r}")
+                    continue
+                games.append(
+                    SteamGame(
+                        appid=parsed_appid,
+                        title=name,
+                        _formatted_price=price,
+                        country_2l=country_2l,
+                    )
                 )
-            )
-    return games
+    # dedupe appids while preserving order (bundle entries can overlap)
+    seen: set[str] = set()
+    unique_games = []
+    for game in games:
+        if game.appid not in seen:
+            seen.add(game.appid)
+            unique_games.append(game)
+    return unique_games
 
 
 class SteamClient(ISteamClient):

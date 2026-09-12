@@ -37,6 +37,7 @@ class Bot:
     async def handle_inline_query(
         self, update: Update, context: CallbackContext[Any, Any, Any, Any]
     ):
+        """Handles regular inline queries receiveed by the bot."""
         assert update.inline_query
         logging.warning(update)
         start = time.time()
@@ -44,8 +45,9 @@ class Bot:
         user_lang_etf = update.inline_query.from_user.language_code
 
         try:
+            query = update.inline_query.query
             game_search_result = await self._game_searcher.handle_game_search(
-                query=update.inline_query.query,
+                query=query,
                 user_id=update.inline_query.from_user.id,
                 user_lang_etf=user_lang_etf,
             )

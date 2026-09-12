@@ -85,7 +85,7 @@ class ScrapedSteamGame(pydantic.BaseModel):
 
     link: str
     title: str
-    appid: str
+    appid: int
     cost: ScrapedCost | None
     is_free: bool
     proton_db_report: ScrapedProtonDBReport | None = None

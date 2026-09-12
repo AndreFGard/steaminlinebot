@@ -73,7 +73,7 @@ class GameSearchService(IGameSearcherService):
             self._client.scrape_game_results(steam_games, country_2l),
             _get_itad_overview_by_appid(
                 self._itad_client,
-                [int(game.appid) for game in steam_games],
+                [game.appid for game in steam_games],
                 country_2l,
             ),
         )
@@ -88,7 +88,7 @@ class GameSearchService(IGameSearcherService):
                     else None
                 )
 
-                itad_overview = itad_by_appid.get(int(steam_game.appid))
+                itad_overview = itad_by_appid.get(steam_game.appid)
                 itad_deals = [
                     itad_deal_to_game_deal(deal, country_2l)
                     for deal in (itad_overview.deals if itad_overview else [])
@@ -105,13 +105,13 @@ class GameSearchService(IGameSearcherService):
                     title=steam_game.title,
                     product_type=steam_game.product_type,
                     source=core.COMMON_GAME_SOURCE_NAMES.STEAM.value,
-                    external_id=steam_game.appid,
+                    external_id=str(steam_game.appid),
                     deals=[d for d in (itad_deals + [steam_deal]) if d is not None],
                     historical_price=historical_price,
                     proton_report=steam_game.proton_db_report,
                 )
 
-                itad_id = itad_ids_by_appid.get(int(steam_game.appid))
+                itad_id = itad_ids_by_appid.get(steam_game.appid)
                 if itad_id is not None:
                     self._game_repo.add_game_external_id(
                         game_id,
@@ -125,7 +125,7 @@ class GameSearchService(IGameSearcherService):
                         title=steam_game.title,
                         product_type=steam_game.product_type,
                     ),
-                    external_id=steam_game.appid,
+                    external_id=str(steam_game.appid),
                     game_source=core.COMMON_GAME_SOURCE_NAMES.STEAM,
                     main_deal=steam_deal,
                     other_deals=itad_deals,

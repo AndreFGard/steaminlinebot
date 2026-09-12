@@ -15,7 +15,7 @@ class IProtonDBClient(ABC):
 
     @abstractmethod
     async def get_reports(
-        self, appids: Iterable[str]
+        self, appids: Iterable[int]
     ) -> list[None | ScrapedProtonDBReport]: ...
 
 
@@ -34,7 +34,7 @@ class ScrapedProtonDBReport:
 
 
 @async_lru_cache_ttl
-async def _get_report(appid: str):
+async def _get_report(appid: int):
     async with aiohttp.ClientSession() as session:
         async with session.get(
             f"https://www.protondb.com/api/v1/reports/summaries/{appid}.json"
@@ -53,7 +53,7 @@ async def _get_report(appid: str):
 
 class ProtonDBClient(IProtonDBClient):
     async def get_reports(
-        self, appids: Iterable[str]
+        self, appids: Iterable[int]
     ) -> list[None | ScrapedProtonDBReport]:
         results = await asyncio.gather(
             *(_get_report(appid) for appid in appids),
