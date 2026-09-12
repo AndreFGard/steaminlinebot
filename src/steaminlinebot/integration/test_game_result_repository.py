@@ -222,7 +222,7 @@ class TestAddGameSource:
             COMMON_GAME_SOURCE_NAMES.STEAM.value,
             "730",
         )
-        repo.add_game_source(
+        repo.add_game_external_id(
             game_id,
             game_source=COMMON_GAME_SOURCE_NAMES.ITAD,
             external_id="itad-123",
@@ -271,7 +271,7 @@ class TestGetGameSource:
             COMMON_GAME_SOURCE_NAMES.STEAM.value,
             "730",
         )
-        repo.add_game_source(
+        repo.add_game_external_id(
             game_id,
             game_source=COMMON_GAME_SOURCE_NAMES.ITAD,
             external_id="itad-123",

@@ -28,20 +28,27 @@ class IGameSearcherService(ABC):
 
 async def _get_itad_overview_by_appid(
     itad_client: itad_client.IITADClient, steam_appids: list[int], country_2l: str
-) -> dict[int, itad_client.ITADPriceOverview | None]:
+) -> tuple[
+    dict[int, itad_client.ITADPriceOverview | None],
+    dict[int, itad_client.ITADGameId | None],
+]:
     if not steam_appids:
-        return {}
-    """Map Steam app ids to their ITAD price overview (or None)."""
+        return {}, {}
+    """Map Steam app ids to their ITAD price overview (or None),
+    and return the Steam→ITAD game id mapping."""
     itad_ids = await itad_client.lookup_by_steam_appid(steam_appids)
     requested = [game_id for game_id in itad_ids if game_id is not None]
     fetched = await itad_client.get_prices(requested, country_2l)
 
     by_id = dict(zip(requested, fetched))
 
-    return {
+    overviews = {
         appid: (by_id.get(itad_id) if itad_id is not None else None)
         for appid, itad_id in zip(steam_appids, itad_ids)
     }
+    id_map = dict(zip(steam_appids, itad_ids))
+
+    return overviews, id_map
 
 
 class GameSearchService(IGameSearcherService):
@@ -62,7 +69,7 @@ class GameSearchService(IGameSearcherService):
     ):
         results: list[core.SourcedGame] = []
         steam_games = await self._client.search_game_title(query, country_2l)
-        steam_results, itad_by_appid = await asyncio.gather(
+        steam_results, (itad_by_appid, itad_ids_by_appid) = await asyncio.gather(
             self._client.scrape_game_results(steam_games, country_2l),
             _get_itad_overview_by_appid(
                 self._itad_client,
@@ -103,6 +110,14 @@ class GameSearchService(IGameSearcherService):
                     historical_price=historical_price,
                     proton_report=steam_game.proton_db_report,
                 )
+
+                itad_id = itad_ids_by_appid.get(int(steam_game.appid))
+                if itad_id is not None:
+                    self._game_repo.add_game_external_id(
+                        game_id,
+                        core.COMMON_GAME_SOURCE_NAMES.ITAD,
+                        str(itad_id),
+                    )
 
                 sourced_game = core.SourcedGame(
                     game=core.Game(

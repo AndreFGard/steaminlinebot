@@ -35,7 +35,7 @@ class GameRepository(IGameRepository):
     def __init__(self, engine: Engine):
         self._engine = engine
 
-    def add_game_source(
+    def add_game_external_id(
         self, game_id: int, game_source: COMMON_GAME_SOURCE_NAMES, external_id: str
     ) -> None:
         with self._engine.begin() as conn:
@@ -172,6 +172,12 @@ def _get_or_insert_game(
     ).first()
 
     if existing is not None:
+        conn.execute(
+            game_table.update()
+            .where(game_table.c.id == existing.game_id, game_table.c.title != title)
+            .values(title=title)
+        )
+
         return existing.game_id
 
     result = conn.execute(

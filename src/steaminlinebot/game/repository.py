@@ -13,7 +13,7 @@ from steaminlinebot.integration.protondb_client import ScrapedProtonDBReport
 
 class IGameRepository(ABC):
     @abstractmethod
-    def add_game_source(
+    def add_game_external_id(
         self, game_id: int, game_source: COMMON_GAME_SOURCE_NAMES, external_id: str
     ) -> None: ...
 

@@ -30,7 +30,7 @@ game_table = sql.Table(
     "game",
     metadata,
     sql.Column("id", sql.Integer, primary_key=True, autoincrement=True),
-    sql.Column("title", sql.String(), nullable=False),
+    sql.Column("title", sql.String(), nullable=True),
     sql.Column(
         "product_type",
         sql.Enum(ProductType),
