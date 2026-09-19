@@ -14,6 +14,7 @@ from telegram import (
     InputTextMessageContent,
 )
 
+import steaminlinebot
 from steaminlinebot.game import core
 from steaminlinebot.game.game_search_usecase import GameSearchResult
 from steaminlinebot.user.user_country import CountryConfig, CountryModification
@@ -306,7 +307,9 @@ class TelegramPresenter(ITelegramPresenter):
             text = (
                 "**How to set your currency:**\n"
                 "Use `/setcurrency CODE` (e.g., `/setcurrency US`).\n\n"
-                "Select one of the popular options below:"
+                "Select one of the popular options below:\n\n"
+                "PS: You can also query the bot temporarily with a specific country by prepending the query with /US, or /CA, or /GB:\n"
+                "EXAMPLE: steaminlinebot /FR call of duty"
             )
             kb = self._make_country_keyboard(alternative_suggestions)
 

@@ -41,6 +41,9 @@ class IUserCountry(ABC):
     ) -> CountryConfig: ...
 
     @abstractmethod
+    async def is_valid_country(self, country_alpha2l: str) -> bool: ...
+
+    @abstractmethod
     async def delete_user(self, user_id: int) -> bool: ...
 
     @abstractmethod
@@ -61,6 +64,9 @@ class IUserCountry(ABC):
 class UserCountry(IUserCountry):
     def __init__(self, user_repo: IUserRepository):
         self._user_repo = user_repo
+        self._valid_countries = frozenset(
+            code.upper() for code in self._user_repo.get_countries()
+        )
 
     async def resolve_country(
         self, user_id: int, fallback_user_language_etf: str | None
@@ -138,3 +144,6 @@ class UserCountry(IUserCountry):
         except Exception as e:
             logging.error(f"delete_user error: {e}")
             return False
+
+    async def is_valid_country(self, country_alpha2l: str) -> bool:
+        return country_alpha2l.upper() in self._valid_countries

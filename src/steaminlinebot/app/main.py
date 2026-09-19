@@ -57,11 +57,13 @@ async def help(update: Update, context):
         f"you want to search in the message box. for example:\n"
         f"{botname} Skyrim\n"
         f"or\n"
-        f"{botname} Stardew Valley\n\n"
-        "\nCurrency config:\n"
+        f"{botname} Stardew Valley\n\n\n"
+        "Currency config:\n"
         "- /setcurrency COUNTRY_CODE\n"
-        "EXAMPLE: /setcurrency US"
-        "\n\n Use /deleteinfo to delete your currency and userid from the system",
+        "EXAMPLE: /setcurrency US\n"
+        "Use /deleteinfo to delete your currency and userid from the system\n\n"
+        "You can also query the bot with a specific country in mind by prepending the query with /US, or /CA, or /GB:\n"
+        f"EXAMPLE: {botname} /FR call of"
     )
 
 

@@ -34,10 +34,24 @@ class GameSearchUsecase(IGameSearchUsecase):
     async def handle_game_search(
         self, query: str, user_id: int, user_lang_etf: str | None
     ) -> GameSearchResult:
+
+        country_config = None
+
+        # @steaminlinebot /US Game
+        first, _, rest = query.partition(" ")
+        if first.startswith("/"):
+            country_str = first[1:].upper()
+            if await self.user_country.is_valid_country(country_str):
+                country_config = CountryConfig(country=country_str, has_configured=True)
+                query = rest.strip()
+
         if len(query) < 3:
             raise QueryTooShortError(str(query))
 
-        country_config = await self.user_country.resolve_country(user_id, user_lang_etf)
+        if country_config is None:
+            country_config = await self.user_country.resolve_country(
+                user_id, user_lang_etf
+            )
 
         search_results = await self.search_games.search_game(
             query, country_2l=country_config.country

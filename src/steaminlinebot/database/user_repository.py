@@ -36,6 +36,9 @@ class IUserRepository(ABC):
     @abstractmethod
     def upsert_user_country(self, user_id: int, country_code: str) -> bool: ...
 
+    @abstractmethod
+    def get_countries(self) -> list[str]: ...
+
 
 class UserRepository(IUserRepository):
     """SQLAlchemy-backed user/country persistence.
@@ -51,6 +54,10 @@ class UserRepository(IUserRepository):
 
     def __init__(self, engine: Engine):
         self._engine = engine
+
+    def get_countries(self) -> list[str]:
+        with self._engine.connect() as conn:
+            return list(conn.execute(select(country_table.c.alpha2)).scalars())
 
     def delete_user(self, user_id: int) -> int:
         """Delete the user row identified by Telegram *user_id*.
