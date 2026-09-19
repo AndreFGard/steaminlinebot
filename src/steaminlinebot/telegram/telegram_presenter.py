@@ -79,6 +79,9 @@ class ITelegramPresenter(ABC):
     @abstractmethod
     def make_delete_confirmation(self, success: bool) -> "TelegramPresentation": ...
 
+    @abstractmethod
+    def make_help_presentation(self) -> "TelegramPresentation": ...
+
     def make_currency_message_from_country(
         self,
         country_mod: CountryModification | None,
@@ -181,6 +184,27 @@ def format_game_result(game: core.SourcedGame) -> GameResultStrings:
 
 class TelegramPresenter(ITelegramPresenter):
     """Concrete implementation: builds real Telegram API objects."""
+
+    def __init__(self, botname: str):
+        self._botname = botname
+
+    def make_help_presentation(self) -> TelegramPresentation:
+        text = (
+            f"To search with this bot, type {self._botname} and then something "
+            f"you want to search in the message box. for example:\n"
+            f"{self._botname} Skyrim\n"
+            f"or\n"
+            f"{self._botname} Stardew Valley\n\n\n"
+            "Currency config:\n"
+            "- /setcurrency COUNTRY_CODE\n"
+            "EXAMPLE: /setcurrency US\n"
+            "Use /deleteinfo to delete your currency and userid from the system\n\n"
+            "You can also query the bot with a specific country in mind by prepending the query with /US, or /CA, or /GB:\n"
+            f"EXAMPLE: {self._botname} /FR call of"
+        )
+        return TelegramPresentation(
+            text=text, keyboard=InlineKeyboardMarkup([]), parse_mode="Markdown"
+        )
 
     def _make_inline_game_article(
         self, strings: GameResultStrings, _: CountryConfig
@@ -309,7 +333,7 @@ class TelegramPresenter(ITelegramPresenter):
                 "Use `/setcurrency CODE` (e.g., `/setcurrency US`).\n\n"
                 "Select one of the popular options below:\n\n"
                 "PS: You can also query the bot temporarily with a specific country by prepending the query with /US, or /CA, or /GB:\n"
-                "EXAMPLE: steaminlinebot /FR call of duty"
+                f"EXAMPLE: {self._botname} /FR call of duty"
             )
             kb = self._make_country_keyboard(alternative_suggestions)
 

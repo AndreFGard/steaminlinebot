@@ -50,23 +50,6 @@ if not os.path.exists("./data"):
     os.mkdir("./data")
 
 
-async def help(update: Update, context):
-    assert update.message is not None
-    return await update.message.reply_text(  # type: ignore
-        f"To search with this bot, type {botname} and then something "
-        f"you want to search in the message box. for example:\n"
-        f"{botname} Skyrim\n"
-        f"or\n"
-        f"{botname} Stardew Valley\n\n\n"
-        "Currency config:\n"
-        "- /setcurrency COUNTRY_CODE\n"
-        "EXAMPLE: /setcurrency US\n"
-        "Use /deleteinfo to delete your currency and userid from the system\n\n"
-        "You can also query the bot with a specific country in mind by prepending the query with /US, or /CA, or /GB:\n"
-        f"EXAMPLE: {botname} /FR call of"
-    )
-
-
 async def error(update: Update, context):
     print(f"Update {update} caused error {context.error}")
 
@@ -102,7 +85,7 @@ async def main():
             game_repo=game_result_repo,
             itad_client=itad,
         )
-        presenter = TelegramPresenter()
+        presenter = TelegramPresenter(botname=botname)
         game_searcher = GameSearchUsecase(
             user_country=user_country,
             search_games=search_games,
@@ -116,19 +99,19 @@ async def main():
 
         application = Application.builder().token(token).build()
 
-        application.add_handler(CommandHandler("start", help))
-        application.add_handler(CommandHandler("help", help))
+        application.add_handler(CommandHandler("start", bot.help))
+        application.add_handler(CommandHandler("help", bot.help))
+        application.add_handler(CommandHandler("setcurrency", bot.set_currency))
+        application.add_handler(CommandHandler("deleteinfo", bot.delete_user_info))
 
         application.add_handler(InlineQueryHandler(bot.handle_inline_query))
 
-        application.add_handler(CommandHandler("setcurrency", bot.set_currency))
-        application.add_handler(CommandHandler("deleteinfo", bot.delete_user_info))
         application.add_handler(CallbackQueryHandler(bot.callback_handler))
 
         application.add_error_handler(error)  # type: ignore
 
         # run_polling() is synchronous and manages its own event loop, so it can't be
-        # called from inside an already-running loop.
+        # called from inside an already running loop.
         async with application:
             assert application.updater
             await application.updater.start_polling()

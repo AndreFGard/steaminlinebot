@@ -37,7 +37,7 @@ class Bot:
     async def handle_inline_query(
         self, update: Update, context: CallbackContext[Any, Any, Any, Any]
     ):
-        """Handles regular inline queries receiveed by the bot."""
+        """Handles regular inline queries reiceved by the bot."""
         assert update.inline_query
         logging.warning(update)
         start = time.time()
@@ -68,6 +68,13 @@ class Bot:
         await update.inline_query.answer(
             presentation.results, cache_time=30, button=presentation.button
         )
+
+    async def help(self, update: Update, context: CallbackContext[Any, Any, Any, Any]):
+        """Handler for the /help and /start commands."""
+        msg = update.message
+        assert msg
+        presentation = self._presenter.make_help_presentation()
+        await msg.reply_text(presentation.text, parse_mode=presentation.parse_mode)
 
     async def delete_user_info(
         self, update: Update, context: CallbackContext[Any, Any, Any, Any]
