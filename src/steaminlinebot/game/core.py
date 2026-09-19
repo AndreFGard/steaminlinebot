@@ -4,7 +4,6 @@ import enum
 import pydantic
 
 from steaminlinebot.game.protondb_report import ProtonDBReport
-from steaminlinebot.integration.protondb_client import ScrapedProtonDBReport
 
 
 class ProductType(enum.Enum):
@@ -79,21 +78,9 @@ class ScrapedCost(pydantic.BaseModel):
     country_l2: str
 
 
-# TODO break this down into a repository DTO, or destroy it altogether.
-class ScrapedSteamGame(pydantic.BaseModel):
-    """Steam scraping result"""
-
-    link: str
-    title: str
-    appid: int
-    cost: ScrapedCost | None
-    is_free: bool
-    proton_db_report: ScrapedProtonDBReport | None = None
-    # TODO make enum
-    product_type: ProductType
-
-
 class SourcedGame(pydantic.BaseModel):
+    """Game information sourced at a specific datetime and location."""
+
     game: Game
     external_id: str
     game_source: COMMON_GAME_SOURCE_NAMES
