@@ -28,8 +28,8 @@ class GameSearchUsecase(IGameSearchUsecase):
         user_country: IUserCountry,
         search_games: IGameSearcherService,
     ):
-        self.user_country = user_country
-        self.search_games = search_games
+        self._user_country = user_country
+        self._search_games = search_games
 
     async def handle_game_search(
         self, query: str, user_id: int, user_lang_etf: str | None
@@ -41,7 +41,7 @@ class GameSearchUsecase(IGameSearchUsecase):
         first, _, rest = query.partition(" ")
         if first.startswith("/"):
             country_str = first[1:].upper()
-            if await self.user_country.is_valid_country(country_str):
+            if await self._user_country.is_valid_country(country_str):
                 country_config = CountryConfig(country=country_str, has_configured=True)
                 query = rest.strip()
 
@@ -49,11 +49,11 @@ class GameSearchUsecase(IGameSearchUsecase):
             raise QueryTooShortError(str(query))
 
         if country_config is None:
-            country_config = await self.user_country.resolve_country(
+            country_config = await self._user_country.resolve_country(
                 user_id, user_lang_etf
             )
 
-        search_results = await self.search_games.search_game(
+        search_results = await self._search_games.search_game(
             query, country_2l=country_config.country
         )
 

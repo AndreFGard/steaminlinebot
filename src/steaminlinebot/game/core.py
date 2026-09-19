@@ -68,16 +68,6 @@ class HistoricalPriceData(pydantic.BaseModel):
     currency_3l: str
 
 
-class ScrapedCost(pydantic.BaseModel):
-    """Cost data from scraping"""
-
-    value_minor: int
-    currency_3l: str
-    full_value_minor: int
-    discount: int
-    country_l2: str
-
-
 class SourcedGame(pydantic.BaseModel):
     """Game information sourced at a specific datetime and location."""
 

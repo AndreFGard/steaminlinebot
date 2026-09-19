@@ -1,7 +1,8 @@
+from steaminlinebot.integration import steam_client
 from steaminlinebot.game import core
 
 
-def steam_cost_to_deal(cost: core.ScrapedCost, url: str) -> core.GameDeal:
+def steam_cost_to_deal(cost: steam_client.SteamCost, url: str) -> core.GameDeal:
     return core.GameDeal(
         value_minor=cost.value_minor,
         currency_3l=cost.currency_3l,

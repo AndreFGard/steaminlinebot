@@ -8,7 +8,7 @@ from attr import dataclass
 from bs4 import BeautifulSoup
 import pydantic
 
-from steaminlinebot.game.core import ProductType, ScrapedCost
+from steaminlinebot.game.core import ProductType
 from steaminlinebot.integration.protondb_client import IProtonDBClient
 from steaminlinebot.integration.protondb_client import (
     ProtonDBClient,
@@ -28,13 +28,23 @@ class SteamGame(pydantic.BaseModel):
     _formatted_price: str | None
 
 
+class SteamCost(pydantic.BaseModel):
+    """Cost data from scraping"""
+
+    value_minor: int
+    currency_3l: str
+    full_value_minor: int
+    discount: int
+    country_l2: str
+
+
 class SteamDetailedGame(pydantic.BaseModel):
     """Steam scraping result"""
 
     link: str
     title: str
     appid: int
-    cost: ScrapedCost | None
+    cost: SteamCost | None
     is_free: bool
     proton_db_report: ScrapedProtonDBReport | None = None
     # TODO make enum
@@ -85,7 +95,7 @@ def _make_game_result(
             cost = None
         else:
             overview = data["price_overview"]
-            cost = ScrapedCost(
+            cost = SteamCost(
                 value_minor=int(overview["final"]),
                 currency_3l=overview["currency"],
                 full_value_minor=int(overview["initial"]),
