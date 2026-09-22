@@ -73,6 +73,7 @@ class SourcedGame(pydantic.BaseModel):
 
     game: Game
     external_id: str
+    itad_id: str | None
     game_source: COMMON_GAME_SOURCE_NAMES
     main_deal: GameDeal | None
     other_deals: list[GameDeal]

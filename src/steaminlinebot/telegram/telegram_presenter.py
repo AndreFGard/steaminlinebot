@@ -14,14 +14,13 @@ from telegram import (
     InputTextMessageContent,
 )
 
-import steaminlinebot
 from steaminlinebot.game import core
 from steaminlinebot.game.game_search_usecase import GameSearchResult
-from steaminlinebot.user.user_country import CountryConfig, CountryModification
+from steaminlinebot.user.user_country import CountryModification
 
 
 @dataclass
-class GameResultStrings:
+class SourcedGameFormatted:
     title: str
     link: str
     appid: str
@@ -108,7 +107,7 @@ def format_price(price_minor: int, currency_3l: str):
     return babel.numbers.format_currency(value, currency_3l)
 
 
-def format_game_result(game: core.SourcedGame) -> GameResultStrings:
+def format_source_game(game: core.SourcedGame) -> SourcedGameFormatted:
     """Builds all user-facing strings for a game search result."""
 
     historical_price_info = ""
@@ -156,7 +155,11 @@ def format_game_result(game: core.SourcedGame) -> GameResultStrings:
         price_line = f"Price: {format_price(game.main_deal.value_minor, game.main_deal.currency_3l)} "
         if game.main_deal.discount:
             price_line += f"[-{game.main_deal.discount}%] "
-        if best_deal and best_deal.value_minor == game.main_deal.value_minor:
+        if (
+            best_deal
+            and game.other_deals
+            and best_deal.value_minor == game.main_deal.value_minor
+        ):
             price_line += "(Best price anywhere!)"
         elif best_deal:
             price_line += "\n" + best_deal_str
@@ -172,13 +175,66 @@ def format_game_result(game: core.SourcedGame) -> GameResultStrings:
         + "\n"
     )
 
-    return GameResultStrings(
+    return SourcedGameFormatted(
         title=game.game.title,
         link=game.url,
         appid=game.external_id,
         description=description,
         message_text=message_text,
         has_proton_db=game.proton_db_info is not None,
+    )
+
+
+def _make_keyboard_markup(
+    appid: str, steam_link: str, has_proton_db: bool, itad_id: str | None
+) -> InlineKeyboardMarkup:
+    row1_buttons = [InlineKeyboardButton("Steam Page", url=steam_link)]
+
+    if has_proton_db:
+        row1_buttons.append(
+            InlineKeyboardButton(
+                "ProtonDB 🐧", url=f"https://www.protondb.com/app/{appid}"
+            )
+        )
+
+    row2_buttons = [
+        InlineKeyboardButton(
+            "SteamDB", url=f"https://steamdb.info/app/{appid}/#pricehistory"
+        ),
+    ]
+    if itad_id:
+        row2_buttons.append(
+            InlineKeyboardButton(
+                "Other Deals", url=f"https://isthereanydeal.com/game/id:{itad_id}/"
+            ),
+        )
+    return InlineKeyboardMarkup([row1_buttons, row2_buttons])
+
+
+def _make_inline_game_article(
+    encoded: SourcedGameFormatted, keyboard: InlineKeyboardMarkup
+) -> TelegramInlineArticlePres:
+
+    query_result = InlineQueryResultArticle(
+        id=str(uuid4()),
+        title=encoded.title,
+        description=encoded.description,
+        thumbnail_url=(
+            "https://cdn.akamai.steamstatic.com/steam/apps/"
+            f"{encoded.appid}/capsule_sm_120.jpg?t"
+        ),
+        input_message_content=InputTextMessageContent(
+            parse_mode="Markdown",
+            message_text=encoded.message_text,
+        ),
+        reply_markup=keyboard,
+    )
+
+    return TelegramInlineArticlePres(
+        query_article=query_result,
+        text=encoded.message_text,
+        keyboard=keyboard,
+        parse_mode="Markdown",
     )
 
 
@@ -206,37 +262,6 @@ class TelegramPresenter(ITelegramPresenter):
             text=text, keyboard=InlineKeyboardMarkup([]), parse_mode="Markdown"
         )
 
-    def _make_inline_game_article(
-        self, strings: GameResultStrings, _: CountryConfig
-    ) -> TelegramInlineArticlePres:
-        keyboard_markup = self._make_keyboard_markup(
-            appid=strings.appid,
-            steam_link=strings.link,
-            has_proton_db=strings.has_proton_db,
-        )
-
-        query_result = InlineQueryResultArticle(
-            id=str(uuid4()),
-            title=strings.title,
-            description=strings.description,
-            thumbnail_url=(
-                "https://cdn.akamai.steamstatic.com/steam/apps/"
-                f"{strings.appid}/capsule_sm_120.jpg?t"
-            ),
-            input_message_content=InputTextMessageContent(
-                parse_mode="Markdown",
-                message_text=strings.message_text,
-            ),
-            reply_markup=keyboard_markup,
-        )
-
-        return TelegramInlineArticlePres(
-            query_article=query_result,
-            text=strings.message_text,
-            keyboard=keyboard_markup,
-            parse_mode="Markdown",
-        )
-
     def _make_special_inline_query_result(
         self, result: SpecialResults
     ) -> InlineQueryResultArticle:
@@ -254,10 +279,18 @@ class TelegramPresenter(ITelegramPresenter):
     ) -> InlineResultListPresentation:
         articles = []
         for game in result.search_results:
-            strings = format_game_result(game)
-            article = self._make_inline_game_article(
-                strings, result.country_config
+            formatted_game = format_source_game(game)
+
+            keyboard_markup = _make_keyboard_markup(
+                appid=formatted_game.appid,
+                steam_link=formatted_game.link,
+                has_proton_db=formatted_game.has_proton_db,
+                itad_id=game.itad_id,
+            )
+            article = _make_inline_game_article(
+                formatted_game, keyboard_markup
             ).query_article
+
             articles.append(article)
 
         if not articles:
@@ -338,26 +371,6 @@ class TelegramPresenter(ITelegramPresenter):
             kb = self._make_country_keyboard(alternative_suggestions)
 
         return CountryPresentation(text=text, keyboard=kb, parse_mode="Markdown")
-
-    def _make_keyboard_markup(
-        self, appid: str, steam_link: str, has_proton_db: bool
-    ) -> InlineKeyboardMarkup:
-        row1_buttons = [InlineKeyboardButton("Steam Page", url=steam_link)]
-
-        if has_proton_db:
-            row1_buttons.append(
-                InlineKeyboardButton(
-                    "ProtonDB 🐧", url=f"https://www.protondb.com/app/{appid}"
-                )
-            )
-
-        row2_buttons = [
-            InlineKeyboardButton(
-                "Price History", url=f"https://steamdb.info/app/{appid}/#pricehistory"
-            )
-        ]
-
-        return InlineKeyboardMarkup([row1_buttons, row2_buttons])
 
 
 def _make_change_currency_button() -> InlineQueryResultsButton:

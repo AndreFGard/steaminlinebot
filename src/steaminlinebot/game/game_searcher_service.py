@@ -126,6 +126,7 @@ class GameSearchService(IGameSearcherService):
                         product_type=steam_game.product_type,
                     ),
                     external_id=str(steam_game.appid),
+                    itad_id=itad_id,
                     game_source=core.COMMON_GAME_SOURCE_NAMES.STEAM,
                     main_deal=steam_deal,
                     other_deals=itad_deals,
