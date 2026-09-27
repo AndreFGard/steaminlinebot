@@ -180,6 +180,33 @@ def _get_or_insert_game(
 
         return existing.game_id
 
+    # automatic fixing of wrongly inserted ids due to bugs
+    mismatched = conn.execute(
+        select(game_external_id_table.c.game_id)
+        .join(game_table, game_table.c.id == game_external_id_table.c.game_id)
+        .where(
+            game_external_id_table.c.source_id == source_id,
+            game_table.c.title == title,
+            game_table.c.product_type == ProductType(product_type.value),
+        )
+        .limit(1)
+    ).first()
+
+    if mismatched is not None:
+        conn.execute(
+            sqlite_insert(game_external_id_table)
+            .values(
+                game_id=mismatched.game_id,
+                source_id=source_id,
+                external_id=external_id,
+            )
+            .on_conflict_do_update(
+                index_elements=["game_id", "source_id"],
+                set_={"external_id": external_id},
+            )
+        )
+        return mismatched.game_id
+
     result = conn.execute(
         game_table.insert().values(
             title=title,

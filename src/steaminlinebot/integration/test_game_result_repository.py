@@ -294,7 +294,7 @@ class TestGetGameSource:
             "730",
         )
         steam_b = repo.get_or_insert_game(
-            "Counter-Strike",
+            "Counter-Strike 2",
             ProductType.GAME,
             COMMON_GAME_SOURCE_NAMES.STEAM.value,
             "999",
@@ -306,3 +306,49 @@ class TestGetGameSource:
         assert ext_a == "730"
         assert ext_b == "999"
         assert ext_a != ext_b
+
+    def test_corrects_wrong_external_id_for_registered_game(self):
+        """Tests the correction of the frequent bug of wrongly inserted ids."""
+        engine = _setup_engine()
+        repo = GameRepository(engine)
+
+        wrong_id_game = repo.get_or_insert_game(
+            "Minecraft Dungeons",
+            ProductType.GAME,
+            COMMON_GAME_SOURCE_NAMES.STEAM.value,
+            "1672981",
+        )
+
+        corrected = repo.get_or_insert_game(
+            "Minecraft Dungeons",
+            ProductType.GAME,
+            COMMON_GAME_SOURCE_NAMES.STEAM.value,
+            "1672970",
+        )
+
+        assert corrected == wrong_id_game
+        assert (
+            repo.get_game_id_on_source(wrong_id_game, COMMON_GAME_SOURCE_NAMES.STEAM)
+            == "1672970"
+        )
+
+    def test_correction_does_not_steal_id_from_other_game(self):
+        engine = _setup_engine()
+        repo = GameRepository(engine)
+
+        game_a = repo.get_or_insert_game(
+            "Game A", ProductType.GAME, COMMON_GAME_SOURCE_NAMES.STEAM.value, "111"
+        )
+        game_b = repo.get_or_insert_game(
+            "Game B", ProductType.GAME, COMMON_GAME_SOURCE_NAMES.STEAM.value, "222"
+        )
+
+        again = repo.get_or_insert_game(
+            "Game B", ProductType.GAME, COMMON_GAME_SOURCE_NAMES.STEAM.value, "222"
+        )
+
+        assert again == game_b
+        assert (
+            repo.get_game_id_on_source(game_a, COMMON_GAME_SOURCE_NAMES.STEAM)
+            == "111"
+        )
