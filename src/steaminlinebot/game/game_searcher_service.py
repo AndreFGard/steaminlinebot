@@ -79,7 +79,7 @@ class GameSearchService(IGameSearcherService):
         )
 
         for steam_game in steam_results.results:
-            if steam_game.product_type.value not in _DESIRED_PRODUCT_TYPES:
+            if steam_game.product_type not in _DESIRED_PRODUCT_TYPES:
                 continue
             try:
                 steam_deal = (
@@ -143,4 +143,6 @@ class GameSearchService(IGameSearcherService):
         return results
 
 
-_DESIRED_PRODUCT_TYPES = set(["game", "dlc"])
+_DESIRED_PRODUCT_TYPES: set[core.ProductType] = set(
+    [core.ProductType.GAME, core.ProductType.DLC]
+)

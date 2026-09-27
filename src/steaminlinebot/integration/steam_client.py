@@ -76,13 +76,17 @@ def _make_game_result(
     country: str | None = None,
 ):
     try:
-        appid = int(list(game_details.keys())[0])
+        # the key might be the appid, but it cant be trusted to be so.
+        assert len(game_details.values()) == 1
+        game = list(game_details.values())[0]
 
-        if not game_details[str(appid)]["success"]:
+        if not game["success"]:
             raise Exception(f"Unsuccessful game_details result: {game_details}")
 
+        data = game["data"]
+        appid = int(data["steam_appid"])
         link = f"https://store.steampowered.com/app/{appid}/"
-        data = game_details[str(appid)]["data"]
+
         title = data["name"]
         product_type = data["type"]
 
@@ -151,7 +155,7 @@ async def _get_many_game_details(
     return results
 
 
-def parse_game_appids_from_suggest_html(
+def parse_games_from_suggest_html(
     suggest_html_data: BeautifulSoup, country_2l: str
 ) -> list[SteamGame]:
 
@@ -168,7 +172,7 @@ def parse_game_appids_from_suggest_html(
 
             name = game.find("div", attrs={"class": "match_name"})
             if name is not None:
-                name = str(name)
+                name = str(name.text)
 
             for appid in appids:
                 try:
@@ -223,7 +227,7 @@ class SteamClient(ISteamClient):
         res = await req
         data = BeautifulSoup(await res.text(), "html.parser")
 
-        appids = parse_game_appids_from_suggest_html(data, country_2l)
+        appids = parse_games_from_suggest_html(data, country_2l)
         return appids
 
     async def scrape_game_results(
