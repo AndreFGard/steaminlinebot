@@ -14,6 +14,7 @@ class ProductType(enum.Enum):
     DLC = "dlc"
     MUSIC = "music"
     MOD = "mod"
+    HARDWARE = "hardware"
 
 
 class HistoricalDeal(enum.Enum):
