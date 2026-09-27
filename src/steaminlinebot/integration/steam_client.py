@@ -95,7 +95,7 @@ def _make_game_result(
         if data["is_free"]:
             is_free = True
             cost = None
-        elif "price_overview" not in data:
+        elif not data.get("price_overview"):
             cost = None
         else:
             overview = data["price_overview"]

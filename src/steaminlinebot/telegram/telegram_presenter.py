@@ -1,3 +1,4 @@
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from decimal import Decimal
@@ -39,11 +40,7 @@ class SpecialResults(Enum):
 class TelegramPresentation:
     keyboard: InlineKeyboardMarkup
     text: str
-    parse_mode: str
-
-    def __post_init__(self):
-        if self.parse_mode not in ["HTML", "Markdown"]:
-            raise ValueError("parse_mode must be either 'HTML' or 'Markdown'")
+    parse_mode: str | None
 
 
 @dataclass
@@ -92,10 +89,15 @@ def make_set_currency_callback(country_code: str) -> str:
     return f"setcurrency {country_code}"
 
 
+def _escape_markdown(text: str) -> str:
+    """Escape characters that have meaning in Telegram legacy Markdown."""
+    return re.sub(r"([_*`\[\\])", r"\\\1", text)
+
+
 _PROTONDB_TIER_EMOJI: dict[str, str] = {
     "GOLD": "🏅(4/5)",
     "SILVER": "🥈(3/5)",
-    "BRONZE": "🥈(2/5)",
+    "BRONZE": "🥉(2/5)",
     "PLATINUM": "🏅(5/5)",
     "BORKED": "❌ (1/5)",
 }
@@ -138,7 +140,7 @@ def format_source_game(game: core.SourcedGame) -> SourcedGameFormatted:
             f"- {best_deal.source_shop}]({best_deal.url})"
         )
 
-    # plain-text description for InlineQueryResultArticle (no markdown support)
+    # plain-text description for InlineQueryResultArticle
     description = "Not purchasable"
     if game.is_free or (game.main_deal and game.main_deal.value_minor == 0):
         description = "Price: Free"
@@ -154,7 +156,7 @@ def format_source_game(game: core.SourcedGame) -> SourcedGameFormatted:
     elif game.main_deal is not None:
         price_line = f"Price: {format_price(game.main_deal.value_minor, game.main_deal.currency_3l)} "
         if game.main_deal.discount:
-            price_line += f"[-{game.main_deal.discount}%] "
+            price_line += f"(-{game.main_deal.discount}%) "
         if (
             best_deal
             and game.other_deals
@@ -164,7 +166,6 @@ def format_source_game(game: core.SourcedGame) -> SourcedGameFormatted:
         elif best_deal:
             price_line += "\n" + best_deal_str
 
-    # assemble the full message text
     message_text = (
         f"[{game.game.title}]({game.url})\n"
         + price_line
@@ -239,7 +240,7 @@ def _make_inline_game_article(
 
 
 class TelegramPresenter(ITelegramPresenter):
-    """Concrete implementation: builds real Telegram API objects."""
+    """Builds telegram API objects"""
 
     def __init__(self, botname: str):
         self._botname = botname
@@ -258,8 +259,9 @@ class TelegramPresenter(ITelegramPresenter):
             "You can also query the bot with a specific country in mind by prepending the query with /US, or /CA, or /GB:\n"
             f"EXAMPLE: {self._botname} /FR call of"
         )
+
         return TelegramPresentation(
-            text=text, keyboard=InlineKeyboardMarkup([]), parse_mode="Markdown"
+            text=text, keyboard=InlineKeyboardMarkup([]), parse_mode=None
         )
 
     def _make_special_inline_query_result(
@@ -356,13 +358,13 @@ class TelegramPresenter(ITelegramPresenter):
                 kb = InlineKeyboardMarkup([])
             else:
                 text = (
-                    f"Could not set currency to *{country_mod.requested_country}*. Is it a valid country code?"
+                    f"Could not set currency to *{_escape_markdown(country_mod.requested_country)}*. Is it a valid country code?"
                     "\nPerhaps you meant one of those:"
                 )
                 kb = self._make_country_keyboard(alternative_suggestions)
         else:
             text = (
-                "**How to set your currency:**\n"
+                "*How to set your currency:*\n"
                 "Use `/setcurrency CODE` (e.g., `/setcurrency US`).\n\n"
                 "Select one of the popular options below:\n\n"
                 "PS: You can also query the bot temporarily with a specific country by prepending the query with /US, or /CA, or /GB:\n"
